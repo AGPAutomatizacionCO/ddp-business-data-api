@@ -1,3 +1,20 @@
+## Ejecutar proyecto con Docker
+
+### Requisitos
+
+- Docker Desktop instalado.
+- Archivo `backend/.env` configurado.
+- Acceso autorizado a la base de datos.
+
+### Pasos
+
+1. Clonar el repositorio.
+
+2. Crear el archivo:
+
+'''text
+backend/.env
+
 # ddp-business-data-api
 API interna para consultas controladas a bases de datos empresariales, manejo seguro de secretos mediante Azure Key Vault y desarrollo gobernado con apoyo de IA.
 
@@ -26,3 +43,7 @@ Frontend: JavaScript
 Base de datos: Azure SQL / SQL Server
 Secretos: Azure Key Vault
 Repositorio: GitHub
+
+
+
+
