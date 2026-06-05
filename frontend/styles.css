@@ -355,3 +355,75 @@ td.sensitive-value {
 .mini-summary strong {
     font-size: 22px;
 }
+.secondary-button {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
+.secondary-button:hover {
+    background: var(--panel-soft);
+}
+
+.hidden {
+    display: none;
+}
+.auth-view {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 35%),
+        var(--bg);
+    padding: 24px;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
+}
+
+.auth-card h1 {
+    margin: 0 0 12px;
+    font-size: 30px;
+}
+
+.auth-card p {
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.auth-warning {
+    margin: 22px 0;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #020617;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.auth-button {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.auth-message {
+    margin-top: 16px;
+    font-size: 14px;
+}
+
+.hidden {
+    display: none !important;
+}

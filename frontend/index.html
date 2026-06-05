@@ -13,7 +13,29 @@
                 <h1>DDP Data Explorer</h1>
                 <p>Gestión, monitoreo y exploración controlada de datos</p>
             </div>
+            <section class="panel">
+                <h2>Sesión</h2>
 
+                <div class="status-list">
+                    <div class="status-item">
+                        <span>Estado</span>
+                        <strong id="authStatus">No autenticado</strong>
+                    </div>
+
+                    <div class="status-item">
+                        <span>Usuario</span>
+                        <strong id="authUser">-</strong>
+                    </div>
+                </div>
+
+                <button id="loginBtn" class="primary-button">
+                    Iniciar sesión con Microsoft
+                </button>
+
+                <button id="logoutBtn" class="secondary-button hidden">
+                    Cerrar sesión
+                </button>
+            </section>
             <section class="panel">
                 <h2>Estado general</h2>
 
@@ -140,7 +162,11 @@
             </section>
         </section>
     </main>
-
+    <!--<script src="https://alcdn.msauth.net/browser/2.37.0/js/msal-browser.min.js"></script>-->
+    <script src="/static/vendor/msal-browser.min.js"></script>
+    <script src="/static/auth/msalConfig.js"></script>
+    <script src="/static/auth/authService.js"></script>
+    <script src="/static/services/apiClient.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

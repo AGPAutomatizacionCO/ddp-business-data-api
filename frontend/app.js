@@ -1,5 +1,3 @@
-const API_BASE_URL = "";
-
 const refreshStatusBtn = document.getElementById("refreshStatusBtn");
 const apiStatusEl = document.getElementById("apiStatus");
 const dbStatusEl = document.getElementById("dbStatus");
@@ -26,6 +24,12 @@ const previewTable = document.getElementById("previewTable");
 const previewThead = previewTable.querySelector("thead");
 const previewTbody = previewTable.querySelector("tbody");
 
+/* MSAL JS */
+const authStatusEl = document.getElementById("authStatus");
+const authUserEl = document.getElementById("authUser");
+const loginBtn = document.getElementById("loginBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+/*   */
 let selectedSchema = null;
 let selectedTable = null;
 let selectedButton = null;
@@ -68,18 +72,14 @@ async function loadHealthSummary() {
         totalSchemasEl.textContent = "-";
         totalTablesEl.textContent = "-";
 
-        const response = await fetch(`${API_BASE_URL}/health/summary`);
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.detail || "No fue posible validar el estado.");
-        }
+        const result = await apiGet("/health/summary");
 
         const api = result.api;
         const database = result.database;
         const summary = result.summary;
 
         setBadge(apiStatusEl, api.status === "ok" ? "Activa" : "Error", api.status);
+
         setBadge(
             dbStatusEl,
             database.database_connection === "available" ? "Conectada" : "No disponible",
@@ -117,12 +117,7 @@ async function loadTables() {
         setStatus("Cargando esquemas y tablas disponibles...");
         tablesContainer.innerHTML = "<p class='muted'>Cargando...</p>";
 
-        const response = await fetch(`${API_BASE_URL}/api/database/tables`);
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.detail || "No fue posible cargar las tablas.");
-        }
+        const result = await apiGet("/api/database/tables");
 
         const tables = result.data || [];
         const groupedTables = groupTablesBySchema(tables);
@@ -242,14 +237,9 @@ async function loadPreview() {
         const schemaEncoded = encodeURIComponent(selectedSchema);
         const tableEncoded = encodeURIComponent(selectedTable);
 
-        const url = `${API_BASE_URL}/api/database/tables/${schemaEncoded}/${tableEncoded}/preview?start_record=${startRecord}&end_record=${endRecord}`;
+        const url = `/api/database/tables/${schemaEncoded}/${tableEncoded}/preview?start_record=${startRecord}&end_record=${endRecord}`;
 
-        const response = await fetch(url);
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.detail || "No fue posible consultar la tabla.");
-        }
+        const result = await apiGet(url);
 
         renderPreview(result.data);
         setStatus("Vista previa cargada correctamente.", "success");
@@ -327,8 +317,44 @@ function renderTable(columns, rows) {
     });
 }
 
+async function loadAuthState() {
+    const account = await initializeAuth();
+
+    if (account) {
+        authStatusEl.textContent = "Autenticado";
+        authStatusEl.classList.add("status-ok");
+        authUserEl.textContent = account.username || account.name || "-";
+
+        loginBtn.classList.add("hidden");
+        logoutBtn.classList.remove("hidden");
+
+        loadTablesBtn.disabled = false;
+        previewBtn.disabled = true;
+
+        await loadHealthSummary();
+
+        setStatus("Sesión iniciada correctamente.", "success");
+        return;
+    }
+
+    authStatusEl.textContent = "No autenticado";
+    authStatusEl.classList.remove("status-ok");
+    authUserEl.textContent = "-";
+
+    loginBtn.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+
+    loadTablesBtn.disabled = true;
+    previewBtn.disabled = true;
+
+    setStatus("Inicie sesión con Microsoft para consultar información.", "error");
+}
+
 refreshStatusBtn.addEventListener("click", loadHealthSummary);
 loadTablesBtn.addEventListener("click", loadTables);
 previewBtn.addEventListener("click", loadPreview);
 
-loadHealthSummary();
+loginBtn.addEventListener("click", loginWithMicrosoft);
+logoutBtn.addEventListener("click", logoutMicrosoft);
+
+loadAuthState();
