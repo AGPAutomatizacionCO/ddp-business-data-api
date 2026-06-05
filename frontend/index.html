@@ -1,11 +1,146 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DDP Business Data Explorer</title>
+    <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-    
+    <main class="app-container">
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>DDP Data Explorer</h1>
+                <p>Gestión, monitoreo y exploración controlada de datos</p>
+            </div>
+
+            <section class="panel">
+                <h2>Estado general</h2>
+
+                <div class="status-list">
+                    <div class="status-item">
+                        <span>API</span>
+                        <strong id="apiStatus">Validando...</strong>
+                    </div>
+
+                    <div class="status-item">
+                        <span>Conexión DB</span>
+                        <strong id="dbStatus">Validando...</strong>
+                    </div>
+
+                    <div class="status-item">
+                        <span>Base de datos</span>
+                        <strong id="dbName">-</strong>
+                    </div>
+                </div>
+
+                <button id="refreshStatusBtn" class="primary-button">
+                    Actualizar estado
+                </button>
+            </section>
+
+            <section class="panel">
+                <h2>Resumen de base</h2>
+
+                <div class="mini-summary">
+                    <div>
+                        <span>Esquemas</span>
+                        <strong id="totalSchemas">-</strong>
+                    </div>
+
+                    <div>
+                        <span>Tablas</span>
+                        <strong id="totalTables">-</strong>
+                    </div>
+                </div>
+
+                <button id="loadTablesBtn" class="primary-button">
+                    Ver esquemas y tablas
+                </button>
+            </section>
+
+            <section class="panel tables-panel">
+                <h2>Esquemas y tablas</h2>
+
+                <div id="tablesContainer" class="tables-container">
+                    <p class="muted">Presione “Ver esquemas y tablas”.</p>
+                </div>
+            </section>
+        </aside>
+
+        <section class="content">
+            <header class="content-header">
+                <div>
+                    <h2 id="selectedTableTitle">Vista principal</h2>
+                    <p id="selectedTableSubtitle">
+                        Estado de la API, conexión a base de datos y exploración controlada.
+                    </p>
+                </div>
+            </header>
+
+            <section class="summary-grid">
+                <article class="summary-card">
+                    <span>Total registros</span>
+                    <strong id="totalRecords">-</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span>Total columnas</span>
+                    <strong id="totalColumns">-</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span>Columnas sensibles</span>
+                    <strong id="sensitiveColumns">-</strong>
+                </article>
+
+                <article class="summary-card">
+                    <span>Registros mostrados</span>
+                    <strong id="returnedRecords">-</strong>
+                </article>
+            </section>
+
+            <section class="panel">
+                <h2>Rango de consulta</h2>
+
+                <div class="filters">
+                    <label>
+                        Desde registro
+                        <input type="number" id="startRecord" min="1" value="1" />
+                    </label>
+
+                    <label>
+                        Hasta registro
+                        <input type="number" id="endRecord" min="1" value="20" />
+                    </label>
+
+                    <button id="previewBtn" class="primary-button" disabled>
+                        Consultar vista previa
+                    </button>
+                </div>
+
+                <p class="help-text">
+                    Máximo permitido por consulta: 100 registros. Solo lectura.
+                </p>
+            </section>
+
+            <section class="panel">
+                <h2>Vista previa de datos</h2>
+
+                <div id="statusMessage" class="status-message">
+                    Estado inicial cargado. Seleccione una tabla para consultar.
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="previewTable">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
 </body>
 </html>
