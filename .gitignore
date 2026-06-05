@@ -9,13 +9,30 @@
 *.user
 *.userosscache
 *.sln.docstates
+# ===============================
+# Project secrets and environments
+# ===============================
+.env
+.env.*
 *.env
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
 
-# User-specific files (MonoDevelop/Xamarin Studio)
-*.userprefs
+# Allow example env files
+!backend/.env.example
+!frontend/.env.example
 
-# Mono auto generated files
-mono_crash.*
+# Python virtual environments
+venv/
+.venv/
+backend/venv/
+backend/.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
 
 # Build results
 [Dd]ebug/
