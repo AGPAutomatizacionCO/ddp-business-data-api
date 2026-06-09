@@ -43,7 +43,7 @@ def get_current_database():
 
 
 def get_tables():
-    query = """
+    tables_query = """
         SELECT 
             DB_NAME() AS database_name,
             s.name AS schema_name,
@@ -56,18 +56,50 @@ def get_tables():
             t.name;
     """
 
+    columns_query = """
+        SELECT 
+            TABLE_SCHEMA AS schema_name,
+            TABLE_NAME AS table_name,
+            COLUMN_NAME AS column_name
+        FROM INFORMATION_SCHEMA.COLUMNS;
+    """
+
     tables = []
 
     with get_db_connection() as connection:
         cursor = connection.cursor()
-        cursor.execute(query)
+
+        cursor.execute(tables_query)
 
         for row in cursor.fetchall():
             tables.append({
                 "database_name": row.database_name,
                 "schema_name": row.schema_name,
-                "table_name": row.table_name
+                "table_name": row.table_name,
+                "has_sensitive_data": False,
+                "sensitive_columns_count": 0,
+                "sensitive_columns": []
             })
+
+        table_index = {
+            f"{table['schema_name']}.{table['table_name']}": table
+            for table in tables
+        }
+
+        cursor.execute(columns_query)
+
+        for row in cursor.fetchall():
+            key = f"{row.schema_name}.{row.table_name}"
+
+            if key not in table_index:
+                continue
+
+            column_name = row.column_name
+
+            if is_sensitive_column(column_name):
+                table_index[key]["has_sensitive_data"] = True
+                table_index[key]["sensitive_columns_count"] += 1
+                table_index[key]["sensitive_columns"].append(column_name)
 
     return tables
 
@@ -109,6 +141,11 @@ def is_sensitive_column(column_name: str) -> bool:
     normalized = column_name.lower()
     return any(keyword in normalized for keyword in SENSITIVE_KEYWORDS)
 
+def mask_sensitive_value(column_name: str, value):
+    if is_sensitive_column(column_name):
+        return "***"
+
+    return value
 
 def safe_sql_identifier(identifier: str) -> str:
     """
@@ -240,10 +277,7 @@ def get_table_preview(
             for index, column_name in enumerate(column_names):
                 value = row[index]
 
-                if is_sensitive_column(column_name):
-                    item[column_name] = "***"
-                else:
-                    item[column_name] = value
+                item[column_name] = mask_sensitive_value(column_name, value)
 
             data.append(item)
 

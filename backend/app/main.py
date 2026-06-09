@@ -29,11 +29,13 @@ app.mount(
 async def add_no_store_headers(request, call_next):
     response = await call_next(request)
 
-    if (
-        request.url.path.startswith("/api/database")
-        or request.url.path.startswith("/health/db")
-        or request.url.path.startswith("/health/summary")
-    ):
+    protected_paths = (
+        "/api/database",
+        "/health/db",
+        "/health/summary"
+    )
+
+    if request.url.path.startswith(protected_paths):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
