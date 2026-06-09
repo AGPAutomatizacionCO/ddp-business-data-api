@@ -54,12 +54,19 @@ async function logoutMicrosoft() {
     const instance = createMsalInstance();
     const account = instance.getActiveAccount();
 
+    currentAccount = null;
+
     if (account) {
         await instance.logoutRedirect({
             account,
             postLogoutRedirectUri: window.location.origin
         });
+
+        return;
     }
+
+    sessionStorage.clear();
+    window.location.href = window.location.origin;
 }
 
 function getCurrentAccount() {

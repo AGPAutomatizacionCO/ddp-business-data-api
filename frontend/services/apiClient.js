@@ -1,4 +1,5 @@
 const API_BASE_URL = "";
+const SEND_BEARER_TOKEN = false;
 
 async function apiRequest(endpoint, options = {}) {
     const defaultHeaders = {
@@ -7,7 +8,11 @@ async function apiRequest(endpoint, options = {}) {
 
     let authHeaders = {};
 
-    if (typeof isAuthenticated === "function" && isAuthenticated()) {
+    if (
+        SEND_BEARER_TOKEN &&
+        typeof isAuthenticated === "function" &&
+        isAuthenticated()
+    ) {
         const token = await getAccessToken();
 
         authHeaders = {

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="es">
 <head>
     <meta charset="UTF-8" />
@@ -7,60 +8,73 @@
     <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
+    <section id="loginView" class="login-view">
+        <div class="login-card">
+            <div class="login-brand">
+                <h1>DDP Data Explorer</h1>
+                <p>Exploración controlada de datos empresariales</p>
+            </div>
+
+```
+        <div class="login-content">
+            <h2>Acceso restringido</h2>
+            <p>
+                Esta herramienta requiere autenticación corporativa mediante Microsoft Entra ID.
+                El acceso y las consultas pueden ser monitoreadas por motivos de seguridad,
+                trazabilidad y gobierno de datos.
+            </p>
+
+            <button id="loginBtn" class="primary-button login-button">
+                Iniciar sesión con Microsoft
+            </button>
+
+            <div id="loginStatusMessage" class="login-status-message">
+                Inicie sesión para continuar.
+            </div>
+        </div>
+    </div>
+</section>
+
+<div id="dashboardView" class="app-shell hidden">
+    <header class="topbar">
+        <div class="topbar-brand">
+            <h1>DDP Data Explorer</h1>
+            <p>Gestión, monitoreo y exploración controlada de datos</p>
+        </div>
+
+        <div class="topbar-status">
+            <div class="topbar-pill">
+                <span>API</span>
+                <strong id="apiStatus">Validando...</strong>
+            </div>
+
+            <div class="topbar-pill">
+                <span>DB</span>
+                <strong id="dbStatus">Validando...</strong>
+            </div>
+
+            <div class="topbar-pill">
+                <span>Base</span>
+                <strong id="dbName">-</strong>
+            </div>
+        </div>
+
+        <div class="topbar-user">
+            <div class="user-avatar" id="userAvatar">-</div>
+
+            <div class="user-meta">
+                <strong id="authUser">-</strong>
+                <span id="authStatus">Autenticado</span>
+            </div>
+
+            <button id="logoutBtn" class="secondary-button">
+                Cerrar sesión
+            </button>
+        </div>
+    </header>
+
     <main class="app-container">
         <aside class="sidebar">
-            <div class="brand">
-                <h1>DDP Data Explorer</h1>
-                <p>Gestión, monitoreo y exploración controlada de datos</p>
-            </div>
-            <section class="panel">
-                <h2>Sesión</h2>
-
-                <div class="status-list">
-                    <div class="status-item">
-                        <span>Estado</span>
-                        <strong id="authStatus">No autenticado</strong>
-                    </div>
-
-                    <div class="status-item">
-                        <span>Usuario</span>
-                        <strong id="authUser">-</strong>
-                    </div>
-                </div>
-
-                <button id="loginBtn" class="primary-button">
-                    Iniciar sesión con Microsoft
-                </button>
-
-                <button id="logoutBtn" class="secondary-button hidden">
-                    Cerrar sesión
-                </button>
-            </section>
-            <section class="panel">
-                <h2>Estado general</h2>
-
-                <div class="status-list">
-                    <div class="status-item">
-                        <span>API</span>
-                        <strong id="apiStatus">Validando...</strong>
-                    </div>
-
-                    <div class="status-item">
-                        <span>Conexión DB</span>
-                        <strong id="dbStatus">Validando...</strong>
-                    </div>
-
-                    <div class="status-item">
-                        <span>Base de datos</span>
-                        <strong id="dbName">-</strong>
-                    </div>
-                </div>
-
-                <button id="refreshStatusBtn" class="primary-button">
-                    Actualizar estado
-                </button>
-            </section>
-
             <section class="panel">
                 <h2>Resumen de base</h2>
 
@@ -74,18 +88,33 @@
                         <span>Tablas</span>
                         <strong id="totalTables">-</strong>
                     </div>
+
+                    <div>
+                        <span>Tablas sensibles</span>
+                        <strong id="totalSensitiveTables">-</strong>
+                    </div>
                 </div>
 
-                <button id="loadTablesBtn" class="primary-button">
-                    Ver esquemas y tablas
-                </button>
+                <div class="button-row">
+                    <button id="refreshStatusBtn" class="secondary-button">
+                        Actualizar
+                    </button>
+
+                </div>
             </section>
 
             <section class="panel tables-panel">
                 <h2>Esquemas y tablas</h2>
 
+                <input 
+                    type="text" 
+                    id="tableSearchInput" 
+                    class="search-input" 
+                    placeholder="Buscar esquema o tabla..."
+                />
+
                 <div id="tablesContainer" class="tables-container">
-                    <p class="muted">Presione “Ver esquemas y tablas”.</p>
+                    <p class="muted">Presione “Ver tablas”.</p>
                 </div>
             </section>
         </aside>
@@ -95,7 +124,7 @@
                 <div>
                     <h2 id="selectedTableTitle">Vista principal</h2>
                     <p id="selectedTableSubtitle">
-                        Estado de la API, conexión a base de datos y exploración controlada.
+                        Seleccione una tabla para consultar una vista previa controlada.
                     </p>
                 </div>
             </header>
@@ -135,10 +164,6 @@
                         Hasta registro
                         <input type="number" id="endRecord" min="1" value="20" />
                     </label>
-
-                    <button id="previewBtn" class="primary-button" disabled>
-                        Consultar vista previa
-                    </button>
                 </div>
 
                 <p class="help-text">
@@ -150,7 +175,7 @@
                 <h2>Vista previa de datos</h2>
 
                 <div id="statusMessage" class="status-message">
-                    Estado inicial cargado. Seleccione una tabla para consultar.
+                    Seleccione una tabla para consultar.
                 </div>
 
                 <div class="table-wrapper">
@@ -162,11 +187,21 @@
             </section>
         </section>
     </main>
-    <!--<script src="https://alcdn.msauth.net/browser/2.37.0/js/msal-browser.min.js"></script>-->
-    <script src="/static/vendor/msal-browser.min.js"></script>
-    <script src="/static/auth/msalConfig.js"></script>
-    <script src="/static/auth/authService.js"></script>
-    <script src="/static/services/apiClient.js"></script>
-    <script src="/static/app.js"></script>
+</div>
+
+<script src="/static/vendor/msal-browser.min.js"></script>
+<script src="/static/auth/msalConfig.js"></script>
+<script src="/static/auth/authService.js"></script>
+<script src="/static/services/apiClient.js"></script>
+<script src="/static/js/state.js"></script>
+<script src="/static/js/dom.js"></script>
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/views.js"></script>
+<script src="/static/js/health.js"></script>
+<script src="/static/js/tables.js"></script>
+<script src="/static/js/preview.js"></script>
+<script src="/static/js/app.js"></script>
+```
+
 </body>
 </html>

@@ -5,6 +5,7 @@
 - Docker Desktop instalado.
 - Archivo `backend/.env` configurado.
 - Acceso autorizado a la base de datos.
+- Actualmente Docker no esta implementado en el proyecto por bloqueos en el equipo para Docker Desktop
 
 ### Pasos
 

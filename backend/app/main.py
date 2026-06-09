@@ -25,7 +25,20 @@ app.mount(
     StaticFiles(directory=FRONTEND_DIR),
     name="static"
 )
+@app.middleware("http")
+async def add_no_store_headers(request, call_next):
+    response = await call_next(request)
 
+    if (
+        request.url.path.startswith("/api/database")
+        or request.url.path.startswith("/health/db")
+        or request.url.path.startswith("/health/summary")
+    ):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+
+    return response
 
 @app.get("/")
 def root():
