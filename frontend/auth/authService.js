@@ -107,3 +107,27 @@ async function getAccessToken() {
         return null;
     }
 }
+async function getMicrosoftIdToken() {
+    const instance = createMsalInstance();
+    const account = getCurrentAccount();
+
+    if (!account) {
+        throw new Error("Usuario no autenticado.");
+    }
+
+    try {
+        const response = await instance.acquireTokenSilent({
+            scopes: ["openid", "profile"],
+            account
+        });
+
+        if (!response.idToken) {
+            throw new Error("No fue posible obtener ID Token de Microsoft.");
+        }
+
+        return response.idToken;
+    } catch (error) {
+        console.error("Error obteniendo ID Token de Microsoft:", error);
+        throw new Error("No fue posible obtener un ID Token válido para crear la sesión backend.");
+    }
+}

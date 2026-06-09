@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,9 +11,14 @@ class Settings(BaseSettings):
     db_encrypt: str = "yes"
     db_trust_certificate: str = "no"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    entra_tenant_id: str
+    entra_frontend_client_id: str
+    entra_issuer: str
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8"
+    )
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
