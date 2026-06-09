@@ -22,6 +22,7 @@ async function apiRequest(endpoint, options = {}) {
 
     const requestOptions = {
         ...options,
+        credentials: "same-origin",
         headers: {
             ...defaultHeaders,
             ...authHeaders,
@@ -55,4 +56,27 @@ async function apiGet(endpoint) {
     return apiRequest(endpoint, {
         method: "GET"
     });
+}
+
+async function apiPost(endpoint, body = {}) {
+    return apiRequest(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body)
+    });
+}
+
+async function createBackendSession() {
+    const idToken = await getMicrosoftIdToken();
+
+    return apiPost("/auth/session", {
+        id_token: idToken
+    });
+}
+
+async function closeBackendSession() {
+    return apiPost("/auth/logout", {});
+}
+
+async function getBackendSession() {
+    return apiGet("/auth/me");
 }

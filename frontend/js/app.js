@@ -13,10 +13,21 @@ DDP.app = {
         DDP.views.setAuthenticatedUser(account);
         DDP.views.showDashboardView();
 
-        await DDP.health.loadSummary();
-        await DDP.tables.load();
+        try {
+            await createBackendSession();
 
-        DDP.views.setStatus("Sesión iniciada correctamente.", "success");
+            await DDP.health.loadSummary();
+            await DDP.tables.load();
+
+            DDP.views.setStatus("Sesión iniciada correctamente.", "success");
+        } catch (error) {
+            console.error("Error creando sesión backend:", error);
+
+            DDP.views.clearDashboardState();
+            DDP.views.showLoginView(
+                "La sesión con Microsoft está activa, pero no fue posible crear la sesión segura en el backend. Revise el backend y vuelva a intentar."
+            );
+        }
     },
 
     async handleLogin() {
@@ -33,6 +44,12 @@ DDP.app = {
 
     async handleLogout() {
         try {
+            try {
+                await closeBackendSession();
+            } catch (sessionError) {
+                console.warn("No fue posible cerrar la sesión backend:", sessionError);
+            }
+
             DDP.views.clearDashboardState();
             DDP.views.setUnauthenticatedUser();
             DDP.utils.clearMsalBrowserStorage();

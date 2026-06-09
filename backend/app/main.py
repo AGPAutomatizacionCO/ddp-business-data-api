@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.database_routes import router as database_router
 from app.api.routes.health_routes import router as health_router
 
@@ -17,14 +18,7 @@ app = FastAPI(
     version="0.1.0"
 )
 
-app.include_router(health_router)
-app.include_router(database_router)
 
-app.mount(
-    "/static",
-    StaticFiles(directory=FRONTEND_DIR),
-    name="static"
-)
 @app.middleware("http")
 async def add_no_store_headers(request, call_next):
     response = await call_next(request)
@@ -32,7 +26,10 @@ async def add_no_store_headers(request, call_next):
     protected_paths = (
         "/api/database",
         "/health/db",
-        "/health/summary"
+        "/health/summary",
+        "/auth/session",
+        "/auth/me",
+        "/auth/logout"
     )
 
     if request.url.path.startswith(protected_paths):
@@ -41,6 +38,18 @@ async def add_no_store_headers(request, call_next):
         response.headers["Expires"] = "0"
 
     return response
+
+
+app.include_router(health_router)
+app.include_router(database_router)
+app.include_router(auth_router)
+
+app.mount(
+    "/static",
+    StaticFiles(directory=FRONTEND_DIR),
+    name="static"
+)
+
 
 @app.get("/")
 def root():

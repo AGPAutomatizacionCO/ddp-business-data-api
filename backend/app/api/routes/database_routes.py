@@ -1,3 +1,5 @@
+from fastapi import Depends
+from app.core.session import require_session
 from fastapi import APIRouter, HTTPException, Query
 from app.services.database_service import (
     get_current_database,
@@ -9,9 +11,9 @@ from app.services.database_service import (
 
 router = APIRouter(
     prefix="/api/database",
-    tags=["Database"]
+    tags=["Database"],
+    dependencies=[Depends(require_session)],
 )
-
 
 @router.get("/current")
 def current_database():
