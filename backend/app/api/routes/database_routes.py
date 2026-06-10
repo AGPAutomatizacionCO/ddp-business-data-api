@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.core.access_control import ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER, require_roles, has_role_permission
 from app.core.request_guard import require_frontend_request
 from app.core.session import require_session
 from app.services.audit_service import write_audit_log
@@ -24,6 +25,8 @@ def current_database(
     session=Depends(require_session),
     frontend=Depends(require_frontend_request)
 ):
+    require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
+
     result = get_current_database()
 
     write_audit_log(
@@ -46,6 +49,8 @@ def list_tables(
     session=Depends(require_session),
     frontend=Depends(require_frontend_request)
 ):
+    require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
+
     result = get_tables()
 
     write_audit_log(
@@ -70,6 +75,8 @@ def list_columns(
     session=Depends(require_session),
     frontend=Depends(require_frontend_request)
 ):
+    require_roles(session, [ROLE_ADMIN, ROLE_ANALYST])
+
     result = get_columns()
 
     write_audit_log(
@@ -96,6 +103,8 @@ def list_table_columns(
     session=Depends(require_session),
     frontend=Depends(require_frontend_request)
 ):
+    require_roles(session, [ROLE_ADMIN, ROLE_ANALYST])
+
     result = get_table_columns(schema_name, table_name)
 
     write_audit_log(
@@ -127,6 +136,27 @@ def table_preview(
     session=Depends(require_session),
     frontend=Depends(require_frontend_request)
 ):
+    if not has_role_permission(session, [ROLE_ADMIN, ROLE_ANALYST]):
+        write_audit_log(
+            request=request,
+            session=session,
+            action="database.table.preview.denied",
+            resource_type="table",
+            resource_name=f"{schema_name}.{table_name}",
+            details={
+                "schema_name": schema_name,
+                "table_name": table_name,
+                "start_record": start_record,
+                "end_record": end_record,
+                "reason": "role_not_allowed"
+            }
+        )
+
+        raise HTTPException(
+            status_code=403,
+            detail="User does not have permission to perform this action."
+        )
+
     try:
         result = get_table_preview(
             schema_name=schema_name,

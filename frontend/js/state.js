@@ -2,7 +2,9 @@
 window.DDP = window.DDP || {};
 
 DDP.state = {
-allTables: [],
-selectedTable: null,
-currentAccount: null
+    allTables: [],
+    selectedTable: null,
+    currentAccount: null,
+    currentUser: null,
+    currentRole: null
 };

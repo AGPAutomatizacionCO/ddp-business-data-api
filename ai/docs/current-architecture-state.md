@@ -193,3 +193,28 @@ Los próximos pasos recomendados son:
 6. Migrar frontend a React/Vite.
 7. Mover sesiones a Redis o base de datos.
 8. Evolucionar hacia Backend API App Registration con Bearer Token real.
+________________________________________________________
+## Control de acceso y roles
+
+La aplicación cuenta con una política de acceso por lista de correos configurada desde variables de entorno.
+
+Cuando la política está activa, solo los usuarios incluidos en las listas internas pueden crear sesión backend.
+
+Roles actuales:
+
+* `ADMIN`: acceso completo.
+* `ANALYST`: acceso a consultas y vistas previas.
+* `VIEWER`: acceso a resumen y listado de tablas, sin vista previa.
+* `UNRESTRICTED`: usado cuando la política de acceso está desactivada.
+
+Variables:
+
+```env
+DDP_ACCESS_POLICY_ENABLED=true
+DDP_ADMIN_USERS=
+DDP_ANALYST_USERS=
+DDP_VIEWER_USERS=
+```
+
+Esta política es temporal para PoC. En producción se recomienda migrar a grupos, roles o scopes administrados desde Microsoft Entra ID.
+

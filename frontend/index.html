@@ -38,8 +38,9 @@
     <div id="dashboardView" class="app-shell hidden">
         <header class="topbar">
             <div class="topbar-brand">
-                <span class="brand-kicker">DDP</span>
-                <div>
+                <div class="brand-mark">DDP</div>
+
+                <div class="topbar-title">
                     <h1>Data Explorer</h1>
                     <p>Gestión, monitoreo y exploración controlada de datos</p>
                 </div>
@@ -68,9 +69,10 @@
                 <div class="user-meta">
                     <strong id="authUser">-</strong>
                     <span id="authStatus">Autenticado</span>
+                    <span id="authRole" class="user-role">Rol pendiente</span>
                 </div>
 
-                <button id="logoutBtn" class="secondary-button">
+                <button id="logoutBtn" class="secondary-button logout-button">
                     Cerrar sesión
                 </button>
             </div>
@@ -79,37 +81,37 @@
         <main class="app-container">
             <aside class="sidebar">
                 <section class="panel summary-panel">
-                    <div class="panel-header">
+                    <div class="panel-heading compact-heading">
                         <div>
-                            <h2>Resumen de base</h2>
-                            <p>Estado general de la fuente conectada.</p>
+                            <h2>Resumen</h2>
+                            <p>Fuente conectada</p>
                         </div>
+
+                        <button id="refreshStatusBtn" class="secondary-button small-button">
+                            Actualizar
+                        </button>
                     </div>
 
                     <div class="mini-summary">
-                        <div>
+                        <div class="mini-card">
                             <span>Esquemas</span>
                             <strong id="totalSchemas">-</strong>
                         </div>
 
-                        <div>
+                        <div class="mini-card">
                             <span>Tablas</span>
                             <strong id="totalTables">-</strong>
                         </div>
 
-                        <div class="mini-summary-full">
-                            <span>Tablas sensibles</span>
+                        <div class="mini-card">
+                            <span>Sensibles</span>
                             <strong id="totalSensitiveTables">-</strong>
                         </div>
                     </div>
-
-                    <button id="refreshStatusBtn" class="secondary-button full-button">
-                        Actualizar información
-                    </button>
                 </section>
 
                 <section class="panel tables-panel">
-                    <div class="panel-header">
+                    <div class="panel-heading">
                         <div>
                             <h2>Esquemas y tablas</h2>
                             <p>Seleccione una tabla para consultar.</p>
@@ -124,67 +126,68 @@
                     />
 
                     <div id="tablesContainer" class="tables-container">
-                        <p class="muted">Las tablas se cargarán automáticamente.</p>
+                        <p class="muted">Cargando tablas...</p>
                     </div>
                 </section>
             </aside>
 
             <section class="content">
-                <header class="content-header">
-                    <div>
+                <section class="panel workspace-header">
+                    <div class="selected-table-block">
                         <span class="section-kicker">Vista controlada</span>
-                        <h2 id="selectedTableTitle">Vista principal</h2>
-                        <p id="selectedTableSubtitle">
-                            Seleccione una tabla para consultar una vista previa controlada.
-                        </p>
-                    </div>
-                </header>
 
-                <section class="summary-grid">
-                    <article class="summary-card">
-                        <span>Total registros</span>
-                        <strong id="totalRecords">-</strong>
-                    </article>
-
-                    <article class="summary-card">
-                        <span>Total columnas</span>
-                        <strong id="totalColumns">-</strong>
-                    </article>
-
-                    <article class="summary-card">
-                        <span>Columnas sensibles</span>
-                        <strong id="sensitiveColumns">-</strong>
-                    </article>
-
-                    <article class="summary-card">
-                        <span>Registros mostrados</span>
-                        <strong id="returnedRecords">-</strong>
-                    </article>
-                </section>
-
-                <section class="panel query-panel">
-                    <div class="panel-header horizontal">
                         <div>
-                            <h2>Rango de consulta</h2>
-                            <p>Máximo permitido por consulta: 100 registros. Solo lectura.</p>
+                            <h2 id="selectedTableTitle">Vista principal</h2>
+                            <p id="selectedTableSubtitle">
+                                Seleccione una tabla para consultar una vista previa controlada.
+                            </p>
                         </div>
+                    </div>
 
-                        <div class="filters">
-                            <label>
-                                Desde registro
-                                <input type="number" id="startRecord" min="1" value="1" />
-                            </label>
+                    <div class="metrics-strip">
+                        <article class="metric-card">
+                            <span>Total registros</span>
+                            <strong id="totalRecords">-</strong>
+                        </article>
 
-                            <label>
-                                Hasta registro
-                                <input type="number" id="endRecord" min="1" value="20" />
-                            </label>
+                        <article class="metric-card">
+                            <span>Total columnas</span>
+                            <strong id="totalColumns">-</strong>
+                        </article>
+
+                        <article class="metric-card">
+                            <span>Columnas sensibles</span>
+                            <strong id="sensitiveColumns">-</strong>
+                        </article>
+
+                        <article class="metric-card">
+                            <span>Mostrados</span>
+                            <strong id="returnedRecords">-</strong>
+                        </article>
+
+                        <div class="range-compact">
+                            <div class="range-title">
+                                <strong>Rango</strong>
+                                <span>Máx. 100 registros</span>
+                            </div>
+
+                            <div class="filters">
+                                <label>
+                                    Desde
+                                    <input type="number" id="startRecord" min="1" value="1" />
+                                </label>
+
+                                <label>
+                                    Hasta
+                                    <input type="number" id="endRecord" min="1" value="20" />
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </section>
 
-                <section class="panel data-panel">
-                    <div class="panel-header">
+                <section class="panel preview-panel">
+                    <div class="preview-panel-header">
                         <div>
                             <h2>Vista previa de datos</h2>
                             <p>Los campos sensibles se enmascaran desde el backend.</p>

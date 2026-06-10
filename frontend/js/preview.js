@@ -229,7 +229,14 @@ DDP.preview = {
 
     async load() {
         const dom = DDP.dom;
+        if (DDP.state.currentRole === "VIEWER") {
+            DDP.views.setStatus(
+                "Tu rol permite ver el resumen y el listado de tablas, pero no consultar vistas previas de datos.",
+                "error"
+            );
 
+            return;
+        }
         try {
             if (!isAuthenticated()) {
                 DDP.views.setStatus("Debe iniciar sesión antes de consultar información.", "error");

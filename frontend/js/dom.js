@@ -7,6 +7,7 @@ DDP.dom = {
 
     authStatus: document.getElementById("authStatus"),
     authUser: document.getElementById("authUser"),
+    authRole: document.getElementById("authRole"),
     userAvatar: document.getElementById("userAvatar"),
 
     loginBtn: document.getElementById("loginBtn"),

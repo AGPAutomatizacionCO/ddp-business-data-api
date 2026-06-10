@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
+from app.core.access_control import require_user_in_access_list
 from app.core.session import (
     create_opaque_session,
     destroy_session,
@@ -24,12 +25,16 @@ def start_session(payload: SessionRequest, response: Response):
     try:
         claims = validate_microsoft_id_token(payload.id_token)
 
+        username = claims.get("preferred_username") or claims.get("email")
+        role = require_user_in_access_list(username)
+
         user_data = {
             "name": claims.get("name"),
-            "username": claims.get("preferred_username") or claims.get("email"),
+            "username": username,
             "tenant_id": claims.get("tid"),
             "local_account_id": claims.get("sub"),
-            "oid": claims.get("oid")
+            "oid": claims.get("oid"),
+            "role": role
         }
 
         session_data = create_opaque_session(response, user_data)

@@ -43,6 +43,7 @@ def write_audit_log(
         "user": {
             "name": user.get("name"),
             "username": user.get("username"),
+            "role": user.get("role"),
             "tenant_id": user.get("tenant_id"),
             "local_account_id": user.get("local_account_id"),
             "oid": user.get("oid")

@@ -14,7 +14,11 @@ DDP.app = {
         DDP.views.showDashboardView();
 
         try {
-            await createBackendSession();
+            const sessionResult = await createBackendSession();
+
+            if (sessionResult?.user) {
+                DDP.views.setAuthenticatedUser(account, sessionResult.user);
+            }
 
             await DDP.health.loadSummary();
             await DDP.tables.load();

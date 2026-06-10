@@ -73,17 +73,45 @@ DDP.views = {
         this.setStatus("Sesión no iniciada.", "info");
     },
 
-    setAuthenticatedUser(account) {
-        const dom = DDP.dom;
-        const displayName = DDP.utils.getUserDisplayName(account);
+    setAuthenticatedUser(account, backendUser = null) {
+        const userName =
+            backendUser?.name ||
+            account?.name ||
+            account?.username ||
+            "Usuario";
 
-        DDP.state.currentAccount = account;
+        const username =
+            backendUser?.username ||
+            account?.username ||
+            "";
 
-        dom.authStatus.textContent = "Autenticado";
-        dom.authStatus.classList.add("status-ok");
+        const role =
+            backendUser?.role ||
+            "Rol pendiente";
 
-        dom.authUser.textContent = displayName;
-        dom.userAvatar.textContent = DDP.utils.getInitials(displayName);
+        DDP.state.currentUser = {
+            name: userName,
+            username,
+            role
+        };
+
+        DDP.state.currentRole = role;
+
+        if (DDP.dom.authUser) {
+            DDP.dom.authUser.textContent = userName;
+        }
+
+        if (DDP.dom.authStatus) {
+            DDP.dom.authStatus.textContent = "Autenticado";
+        }
+
+        if (DDP.dom.authRole) {
+            DDP.dom.authRole.textContent = role;
+        }
+
+        if (DDP.dom.userAvatar) {
+            DDP.dom.userAvatar.textContent = DDP.utils.getInitials(userName);
+        }
     },
 
     setUnauthenticatedUser() {
