@@ -24,6 +24,7 @@ DDP.app = {
             console.error("Error creando sesión backend:", error);
 
             DDP.views.clearDashboardState();
+
             DDP.views.showLoginView(
                 "La sesión con Microsoft está activa, pero no fue posible crear la sesión segura en el backend. Revise el backend y vuelva a intentar."
             );
@@ -61,6 +62,55 @@ DDP.app = {
         }
     },
 
+    handleApiError(event) {
+        const error = event.detail || {};
+
+        console.warn("DDP API error:", error);
+
+        if (error.status === 401) {
+            DDP.views.clearDashboardState();
+            DDP.views.setUnauthenticatedUser();
+
+            DDP.views.showLoginView(
+                "La sesión segura expiró o no es válida. Inicie sesión nuevamente."
+            );
+
+            return;
+        }
+
+        if (error.status === 403) {
+            DDP.views.setStatus(
+                "Acceso bloqueado. La consulta debe realizarse desde la aplicación web.",
+                "error"
+            );
+
+            return;
+        }
+
+        if (error.status === 0) {
+            DDP.views.setStatus(
+                "No fue posible conectar con el backend. Verifique que FastAPI esté activo.",
+                "error"
+            );
+
+            return;
+        }
+
+        if (error.status >= 500) {
+            DDP.views.setStatus(
+                "El backend presentó un error interno. Revise la terminal del servidor.",
+                "error"
+            );
+
+            return;
+        }
+
+        DDP.views.setStatus(
+            error.message || "No fue posible completar la solicitud.",
+            "error"
+        );
+    },
+
     bindEvents() {
         const dom = DDP.dom;
 
@@ -68,8 +118,16 @@ DDP.app = {
         dom.logoutBtn.addEventListener("click", () => this.handleLogout());
 
         dom.refreshStatusBtn.addEventListener("click", async () => {
-            await DDP.health.loadSummary();
-            await DDP.tables.load();
+            try {
+                DDP.views.setStatus("Actualizando información...", "info");
+
+                await DDP.health.loadSummary();
+                await DDP.tables.load();
+
+                DDP.views.setStatus("Información actualizada correctamente.", "success");
+            } catch (error) {
+                console.error("Error actualizando información:", error);
+            }
         });
 
         dom.tableSearchInput.addEventListener("input", () => {
@@ -86,6 +144,10 @@ DDP.app = {
             if (DDP.state.selectedTable) {
                 DDP.preview.load();
             }
+        });
+
+        window.addEventListener("ddp-api-error", (event) => {
+            this.handleApiError(event);
         });
 
         window.addEventListener("pageshow", () => {

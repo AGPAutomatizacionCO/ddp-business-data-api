@@ -15,10 +15,19 @@ class Settings(BaseSettings):
     entra_frontend_client_id: str
     entra_issuer: str
 
+    cors_allowed_origins: str = "http://localhost:8000"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8"
     )
+
+    def get_cors_allowed_origins(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        ]
 
 
 settings = Settings()  # type: ignore[call-arg]

@@ -20,6 +20,7 @@ backend/.env
 backend/.env.*
 frontend/.env
 frontend/.env.*
+backend/logs/
 
 # Allow example env files
 !backend/.env.example
