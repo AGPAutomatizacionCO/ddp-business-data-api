@@ -217,4 +217,15 @@ DDP_VIEWER_USERS=
 ```
 
 Esta política es temporal para PoC. En producción se recomienda migrar a grupos, roles o scopes administrados desde Microsoft Entra ID.
+______________________________________________________
+## Trazabilidad por Request ID
 
+Cada petición generada desde el frontend incluye un identificador único en el header `X-Request-ID`.
+
+El backend conserva ese identificador, lo devuelve en la respuesta y lo registra en auditoría. Esto permite relacionar eventos entre:
+
+- Network del navegador.
+- Respuesta del backend.
+- Archivo `audit.jsonl`.
+
+Este mecanismo mejora la trazabilidad técnica y facilita el diagnóstico de errores o consultas específicas.

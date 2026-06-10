@@ -49,6 +49,7 @@ def write_audit_log(
             "oid": user.get("oid")
         },
         "request": {
+            "request_id": getattr(request.state, "request_id", None),
             "method": request.method,
             "path": request.url.path,
             "query": str(request.url.query),

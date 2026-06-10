@@ -1,4 +1,5 @@
 from pathlib import Path
+import uuid
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +10,15 @@ from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.database_routes import router as database_router
 from app.api.routes.health_routes import router as health_router
 from app.core.config import settings
+
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.core.errors import (
+    http_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler
+)
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -21,7 +31,20 @@ app = FastAPI(
     description="API local para consultar datos empresariales de forma controlada.",
     version="0.1.0"
 )
+app.add_exception_handler(
+    StarletteHTTPException,
+    http_exception_handler
+)
 
+app.add_exception_handler(
+    RequestValidationError,
+    validation_exception_handler
+)
+
+app.add_exception_handler(
+    Exception,
+    unhandled_exception_handler
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,7 +60,16 @@ app.add_middleware(
         "X-DDP-Client"
     ],
 )
+@app.middleware("http")
+async def add_request_id(request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
 
+    request.state.request_id = request_id
+
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+
+    return response
 
 @app.middleware("http")
 async def add_no_store_headers(request, call_next):
