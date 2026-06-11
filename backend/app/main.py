@@ -10,9 +10,12 @@ from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.database_routes import router as database_router
 from app.api.routes.health_routes import router as health_router
 from app.core.config import settings
+print("CORS ORIGINS:", settings.get_cors_allowed_origins())
 
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app.api.routes.database_catalog_routes import router as database_catalog_router
 
 from app.core.errors import (
     http_exception_handler,
@@ -53,11 +56,12 @@ app.add_middleware(
     allow_methods=[
         "GET",
         "POST",
-        "OPTIONS"
+        "OPTIONS",
     ],
     allow_headers=[
         "Content-Type",
-        "X-DDP-Client"
+        "X-DDP-Client",
+        "X-Request-ID",
     ],
 )
 @app.middleware("http")
@@ -95,6 +99,7 @@ async def add_no_store_headers(request, call_next):
 app.include_router(health_router)
 app.include_router(database_router)
 app.include_router(auth_router)
+app.include_router(database_catalog_router)
 
 
 app.mount(

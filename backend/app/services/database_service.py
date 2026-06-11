@@ -1,5 +1,7 @@
 from app.db.connection import get_db_connection
 from typing import Any
+from app.core.database_catalog import DatabaseConnectionConfig, get_database_connection
+import pyodbc
 
 SENSITIVE_KEYWORDS = [
     "password",
@@ -341,3 +343,305 @@ def get_database_summary():
             "total_schemas": int(row.total_schemas) if row else 0,
             "total_tables": int(row.total_tables) if row else 0
         }
+def build_connection_string_from_config(config: DatabaseConnectionConfig) -> str:
+    return (
+        f"DRIVER={{{config.driver}}};"
+        f"SERVER={config.server},{config.port};"
+        f"DATABASE={config.database};"
+        f"UID={config.user};"
+        f"PWD={config.password};"
+        f"Encrypt={config.encrypt};"
+        f"TrustServerCertificate={config.trust_certificate};"
+    )
+
+
+def check_database_connection_by_id(database_id: str) -> dict:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    try:
+        with pyodbc.connect(connection_string, timeout=10) as connection:
+            cursor = connection.cursor()
+            cursor.execute("SELECT DB_NAME()")
+            row = cursor.fetchone()
+            if row is None:
+                return {
+                    "status": "error",
+                    "database_id": database_config.id,
+                    "database": database_config.database,
+                    "label": database_config.label,
+                    "message": "No database name was returned by SQL Server.",
+                }
+
+            current_database = row[0]
+
+        return {
+            "status": "ok",
+            "database_id": database_config.id,
+            "database": current_database,
+            "label": database_config.label,
+        }
+
+    except Exception as error:
+        return {
+            "status": "error",
+            "database_id": database_config.id,
+            "database": database_config.database,
+            "label": database_config.label,
+            "message": str(error),
+        }
+
+
+def get_database_summary_by_id(database_id: str) -> dict:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    query = """
+        SELECT
+            COUNT(DISTINCT TABLE_SCHEMA) AS total_schemas,
+            COUNT(*) AS total_tables
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE'
+    """
+
+    with pyodbc.connect(connection_string) as connection:
+        cursor = connection.cursor()
+        cursor.execute(query)
+        row = cursor.fetchone()
+
+        if row is None:
+            return {
+                "database_id": database_config.id,
+                "database": database_config.database,
+                "label": database_config.label,
+                "total_schemas": 0,
+                "total_tables": 0,
+            }
+
+    return {
+        "database_id": database_config.id,
+        "database": database_config.database,
+        "label": database_config.label,
+        "total_schemas": row[0],
+        "total_tables": row[1],
+    }
+
+def get_table_columns_by_database_id(
+    database_id: str,
+    schema_name: str,
+    table_name: str,
+) -> list[dict]:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    query = """
+        SELECT
+            COLUMN_NAME,
+            DATA_TYPE,
+            IS_NULLABLE,
+            CHARACTER_MAXIMUM_LENGTH
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = ?
+        AND TABLE_NAME = ?
+        ORDER BY ORDINAL_POSITION
+    """
+
+    with pyodbc.connect(connection_string) as connection:
+        cursor = connection.cursor()
+        cursor.execute(query, schema_name, table_name)
+
+        columns = []
+
+        for row in cursor.fetchall():
+            column_name = row.COLUMN_NAME
+
+            columns.append(
+                {
+                    "name": column_name,
+                    "type": row.DATA_TYPE,
+                    "is_nullable": row.IS_NULLABLE == "YES",
+                    "max_length": row.CHARACTER_MAXIMUM_LENGTH,
+                    "is_sensitive": is_sensitive_column(column_name),
+                }
+            )
+
+    return columns
+
+
+def get_tables_by_database_id(database_id: str) -> list[dict]:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    tables_query = """
+        SELECT
+            TABLE_SCHEMA,
+            TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_TYPE = 'BASE TABLE'
+        ORDER BY TABLE_SCHEMA, TABLE_NAME
+    """
+
+    columns_query = """
+        SELECT
+            TABLE_SCHEMA,
+            TABLE_NAME,
+            COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION
+    """
+
+    with pyodbc.connect(connection_string, timeout=15) as connection:
+        cursor = connection.cursor()
+
+        cursor.execute(tables_query)
+
+        tables = []
+
+        for row in cursor.fetchall():
+            schema_name = row.TABLE_SCHEMA
+            table_name = row.TABLE_NAME
+
+            tables.append(
+                {
+                    "schema": schema_name,
+                    "name": table_name,
+                    "full_name": f"{schema_name}.{table_name}",
+                    "has_sensitive_data": False,
+                    "sensitive_columns_count": 0,
+                    "sensitive_columns": [],
+                }
+            )
+
+        cursor.execute(columns_query)
+
+        columns_by_table = {}
+
+        for row in cursor.fetchall():
+            schema_name = row.TABLE_SCHEMA
+            table_name = row.TABLE_NAME
+            column_name = row.COLUMN_NAME
+
+            table_key = f"{schema_name}.{table_name}"
+
+            if table_key not in columns_by_table:
+                columns_by_table[table_key] = []
+
+            columns_by_table[table_key].append(column_name)
+
+    for table in tables:
+        table_key = f"{table['schema']}.{table['name']}"
+        column_names = columns_by_table.get(table_key, [])
+
+        sensitive_columns = [
+            column_name
+            for column_name in column_names
+            if is_sensitive_column(column_name)
+        ]
+
+        table["has_sensitive_data"] = len(sensitive_columns) > 0
+        table["sensitive_columns_count"] = len(sensitive_columns)
+        table["sensitive_columns"] = sensitive_columns
+
+    return tables
+def get_table_preview_by_database_id(
+    database_id: str,
+    schema_name: str,
+    table_name: str,
+    start_record: int = 1,
+    end_record: int = 20,
+) -> dict:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    max_records = 100
+
+    if start_record < 1:
+        raise ValueError("start_record must be greater than or equal to 1.")
+
+    if end_record < start_record:
+        raise ValueError("end_record must be greater than or equal to start_record.")
+
+    requested_records = end_record - start_record + 1
+
+    if requested_records > max_records:
+        raise ValueError(f"Maximum records per request is {max_records}.")
+
+    columns = get_table_columns_by_database_id(
+        database_id=database_id,
+        schema_name=schema_name,
+        table_name=table_name,
+    )
+
+    column_names = [column["name"] for column in columns]
+
+    if not column_names:
+        raise ValueError("Table not found or table has no columns.")
+
+    sensitive_columns = [
+        column["name"]
+        for column in columns
+        if column.get("is_sensitive")
+    ]
+
+    safe_columns = ", ".join(
+        f"[{column_name}]"
+        for column_name in column_names
+    )
+
+    count_query = f"""
+        SELECT COUNT(*) AS total_records
+        FROM [{schema_name}].[{table_name}]
+    """
+
+    preview_query = f"""
+        SELECT {safe_columns}
+        FROM [{schema_name}].[{table_name}]
+        ORDER BY (SELECT NULL)
+        OFFSET ? ROWS
+        FETCH NEXT ? ROWS ONLY
+    """
+
+    offset = start_record - 1
+    limit = requested_records
+
+    with pyodbc.connect(connection_string, timeout=20) as connection:
+        cursor = connection.cursor()
+
+        cursor.execute(count_query)
+        count_row = cursor.fetchone()
+        total_records = count_row[0] if count_row else 0
+
+        cursor.execute(preview_query, offset, limit)
+
+        rows = cursor.fetchall()
+
+    data = []
+
+    for row in rows:
+        record = {}
+
+        for index, column_name in enumerate(column_names):
+            value = row[index]
+
+            if column_name in sensitive_columns:
+                record[column_name] = "***"
+            else:
+                record[column_name] = value
+
+        data.append(record)
+
+    return {
+        "database_id": database_config.id,
+        "database": database_config.database,
+        "label": database_config.label,
+        "schema": schema_name,
+        "table": table_name,
+        "total_records": total_records,
+        "start_record": start_record,
+        "end_record": end_record,
+        "returned_records": len(data),
+        "max_records_per_request": max_records,
+        "sensitive_columns": sensitive_columns,
+        "columns": column_names,
+        "data": data,
+    }

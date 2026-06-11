@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     db_encrypt: str = "yes"
     db_trust_certificate: str = "no"
 
+    db_connections: str = "main"
+
     entra_tenant_id: str
     entra_frontend_client_id: str
     entra_issuer: str
@@ -25,7 +27,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
     def get_cors_allowed_origins(self) -> list[str]:
@@ -44,6 +46,13 @@ class Settings(BaseSettings):
     def get_viewer_users(self) -> list[str]:
         return self._split_emails(self.ddp_viewer_users)
 
+    def get_database_connection_ids(self) -> list[str]:
+        return [
+            connection_id.strip().lower()
+            for connection_id in self.db_connections.split(",")
+            if connection_id.strip()
+        ]
+
     @staticmethod
     def _split_emails(value: str) -> list[str]:
         return [
@@ -53,4 +62,4 @@ class Settings(BaseSettings):
         ]
 
 
-settings = Settings()  # type: ignore[call-arg]
+settings: Settings = Settings()  # type: ignore[call-arg]
