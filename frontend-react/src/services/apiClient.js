@@ -203,3 +203,17 @@ export function getDatabaseTablePreview(
         `/api/databases/${databaseId}/tables/${schemaName}/${tableName}/preview?${params.toString()}`
     );
 }
+export function getDatabaseObjects(databaseId) {
+    return apiGet(`/api/databases/${databaseId}/objects`);
+}
+
+export function getDatabaseObjectDefinition(
+    databaseId,
+    objectType,
+    schemaName,
+    objectName
+) {
+    return apiGet(
+        `/api/databases/${databaseId}/objects/${objectType}/${schemaName}/${objectName}/definition`
+    );
+}

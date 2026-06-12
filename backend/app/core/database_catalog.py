@@ -103,13 +103,42 @@ def get_database_connection(database_id: str) -> DatabaseConnectionConfig:
     normalized_id = normalize_database_id(database_id)
 
     if normalized_id == "main":
+        legacy_server = settings.db_server
+        legacy_database = settings.db_name
+        legacy_user = settings.db_user
+        legacy_password = settings.db_password
+
+        required_legacy_values = {
+            "DB_SERVER": legacy_server,
+            "DB_NAME": legacy_database,
+            "DB_USER": legacy_user,
+            "DB_PASSWORD": legacy_password,
+        }
+
+        missing_legacy_keys = [
+            key
+            for key, value in required_legacy_values.items()
+            if not value
+        ]
+
+        if missing_legacy_keys:
+            raise build_incomplete_connection_error(
+                database_id="main",
+                missing_keys=missing_legacy_keys,
+            )
+
+        assert legacy_server is not None
+        assert legacy_database is not None
+        assert legacy_user is not None
+        assert legacy_password is not None
+
         return DatabaseConnectionConfig(
             id="main",
             label=get_env_value("DB_MAIN", "LABEL", "DDP Business Data") or "DDP Business Data",
-            server=settings.db_server,
-            database=settings.db_name,
-            user=settings.db_user,
-            password=settings.db_password,
+            server=legacy_server,
+            database=legacy_database,
+            user=legacy_user,
+            password=legacy_password,
             port=settings.db_port,
             driver=settings.db_driver,
             encrypt=settings.db_encrypt,
@@ -121,6 +150,7 @@ def get_database_connection(database_id: str) -> DatabaseConnectionConfig:
             sla_level=get_env_value("DB_MAIN", "SLA_LEVEL", "internal") or "internal",
             enabled=get_env_bool("DB_MAIN", "ENABLED", True),
         )
+
 
     allowed_ids = settings.get_database_connection_ids()
 

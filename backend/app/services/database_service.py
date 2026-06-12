@@ -645,3 +645,294 @@ def get_table_preview_by_database_id(
         "columns": column_names,
         "data": data,
     }
+def normalize_database_object_type(
+    sql_type: str,
+    type_description: str | None = None,
+) -> dict:
+    raw_sql_type = (sql_type or "").upper().strip()
+    raw_description = (type_description or "").upper().strip()
+
+    aliases = {
+        "U": "TABLE",
+        "USER_TABLE": "TABLE",
+        "USER TABLE": "TABLE",
+
+        "V": "VIEW",
+        "VIEW": "VIEW",
+
+        "P": "PROCEDURE",
+        "PC": "PROCEDURE",
+        "X": "PROCEDURE",
+        "SQL_STORED_PROCEDURE": "PROCEDURE",
+        "SQL STORED PROCEDURE": "PROCEDURE",
+        "CLR_STORED_PROCEDURE": "PROCEDURE",
+        "EXTENDED_STORED_PROCEDURE": "PROCEDURE",
+
+        "FN": "FUNCTION",
+        "IF": "FUNCTION",
+        "TF": "FUNCTION",
+        "FS": "FUNCTION",
+        "FT": "FUNCTION",
+        "SQL_SCALAR_FUNCTION": "FUNCTION",
+        "SQL_INLINE_TABLE_VALUED_FUNCTION": "FUNCTION",
+        "SQL_TABLE_VALUED_FUNCTION": "FUNCTION",
+        "CLR_SCALAR_FUNCTION": "FUNCTION",
+        "CLR_TABLE_VALUED_FUNCTION": "FUNCTION",
+
+        "TR": "TRIGGER",
+        "TA": "TRIGGER",
+        "SQL_TRIGGER": "TRIGGER",
+        "CLR_TRIGGER": "TRIGGER",
+
+        "SN": "SYNONYM",
+        "SYNONYM": "SYNONYM",
+
+        "SO": "SEQUENCE",
+        "SEQUENCE_OBJECT": "SEQUENCE",
+        "SEQUENCE": "SEQUENCE",
+    }
+
+    normalized_type = aliases.get(raw_sql_type)
+
+    if not normalized_type:
+        normalized_type = aliases.get(raw_description)
+
+    type_map = {
+        "TABLE": {
+            "type": "TABLE",
+            "type_label": "Tabla",
+            "family": "DATA",
+            "family_label": "Datos",
+            "supports_preview": True,
+            "supports_definition": False,
+        },
+        "VIEW": {
+            "type": "VIEW",
+            "type_label": "Vista",
+            "family": "DATA",
+            "family_label": "Datos",
+            "supports_preview": True,
+            "supports_definition": True,
+        },
+        "PROCEDURE": {
+            "type": "PROCEDURE",
+            "type_label": "Procedimiento",
+            "family": "LOGIC",
+            "family_label": "Lógica SQL",
+            "supports_preview": False,
+            "supports_definition": True,
+        },
+        "FUNCTION": {
+            "type": "FUNCTION",
+            "type_label": "Función",
+            "family": "LOGIC",
+            "family_label": "Lógica SQL",
+            "supports_preview": False,
+            "supports_definition": True,
+        },
+        "TRIGGER": {
+            "type": "TRIGGER",
+            "type_label": "Trigger",
+            "family": "LOGIC",
+            "family_label": "Lógica automática",
+            "supports_preview": False,
+            "supports_definition": True,
+        },
+        "SYNONYM": {
+            "type": "SYNONYM",
+            "type_label": "Sinónimo",
+            "family": "SUPPORT",
+            "family_label": "Soporte",
+            "supports_preview": False,
+            "supports_definition": False,
+        },
+        "SEQUENCE": {
+            "type": "SEQUENCE",
+            "type_label": "Secuencia",
+            "family": "SUPPORT",
+            "family_label": "Soporte",
+            "supports_preview": False,
+            "supports_definition": False,
+        },
+    }
+
+    if normalized_type in type_map:
+        return type_map[normalized_type]
+
+    fallback_label = type_description or sql_type or "Otro objeto"
+
+    return {
+        "type": "OTHER",
+        "type_label": fallback_label.replace("_", " ").title(),
+        "family": "SUPPORT",
+        "family_label": "Soporte",
+        "supports_preview": False,
+        "supports_definition": False,
+    }
+
+def get_database_objects_by_id(database_id: str) -> list[dict]:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    objects_query = """
+        SELECT
+            s.name AS schema_name,
+            o.name AS object_name,
+            o.type AS object_type,
+            o.type_desc AS object_type_description,
+            o.create_date,
+            o.modify_date,
+            CAST(NULL AS NVARCHAR(MAX)) AS base_object_name
+        FROM sys.objects o
+        INNER JOIN sys.schemas s
+            ON o.schema_id = s.schema_id
+        WHERE o.type IN (
+            'U',   -- user table
+            'V',   -- view
+            'P',   -- stored procedure
+            'PC',  -- CLR stored procedure
+            'X',   -- extended procedure
+            'FN',  -- scalar function
+            'IF',  -- inline table-valued function
+            'TF',  -- table-valued function
+            'FS',  -- CLR scalar function
+            'FT',  -- CLR table-valued function
+            'TR',  -- trigger
+            'TA',  -- CLR trigger
+            'SN',  -- synonym
+            'SO'   -- sequence
+        )
+        AND o.is_ms_shipped = 0
+
+        UNION ALL
+
+        SELECT
+            s.name AS schema_name,
+            syn.name AS object_name,
+            'SN' AS object_type,
+            'SYNONYM' AS object_type_description,
+            syn.create_date,
+            syn.modify_date,
+            syn.base_object_name
+        FROM sys.synonyms syn
+        INNER JOIN sys.schemas s
+            ON syn.schema_id = s.schema_id
+
+        ORDER BY
+            schema_name,
+            object_type_description,
+            object_name
+    """
+
+    with pyodbc.connect(connection_string, timeout=20) as connection:
+        cursor = connection.cursor()
+        cursor.execute(objects_query)
+        rows = cursor.fetchall()
+
+    objects = []
+
+    for row in rows:
+        type_config = normalize_database_object_type(
+            row.object_type,
+            row.object_type_description,
+        )
+
+        schema_name = row.schema_name
+        object_name = row.object_name
+
+        objects.append(
+            {
+                "database_id": database_config.id,
+                "database": database_config.database,
+                "database_label": database_config.label,
+                "schema": schema_name,
+                "name": object_name,
+                "full_name": f"{schema_name}.{object_name}",
+                "sql_type": row.object_type,
+                "sql_type_description": row.object_type_description,
+                "type": type_config["type"],
+                "type_label": type_config["type_label"],
+                "family": type_config["family"],
+                "family_label": type_config["family_label"],
+                "supports_preview": type_config["supports_preview"],
+                "supports_definition": type_config["supports_definition"],
+                "create_date": row.create_date.isoformat() if row.create_date else None,
+                "modify_date": row.modify_date.isoformat() if row.modify_date else None,
+                "base_object_name": row.base_object_name,
+                "has_sensitive_data": False,
+                "sensitive_columns_count": 0,
+                "sensitive_columns": [],
+            }
+        )
+
+    return objects
+
+
+def get_database_object_definition_by_id(
+    database_id: str,
+    object_type: str,
+    schema_name: str,
+    object_name: str,
+) -> dict:
+    database_config = get_database_connection(database_id)
+    connection_string = build_connection_string_from_config(database_config)
+
+    definition_query = """
+        SELECT
+            s.name AS schema_name,
+            o.name AS object_name,
+            o.type AS object_type,
+            o.type_desc AS object_type_description,
+            o.create_date,
+            o.modify_date,
+            m.definition
+        FROM sys.objects o
+        INNER JOIN sys.schemas s
+            ON o.schema_id = s.schema_id
+        LEFT JOIN sys.sql_modules m
+            ON o.object_id = m.object_id
+        WHERE
+            s.name = ?
+            AND o.name = ?
+            AND o.is_ms_shipped = 0
+    """
+
+    with pyodbc.connect(connection_string, timeout=20) as connection:
+        cursor = connection.cursor()
+        cursor.execute(definition_query, schema_name, object_name)
+        row = cursor.fetchone()
+
+    if not row:
+        raise ValueError("Database object not found.")
+
+    type_config = normalize_database_object_type(
+        row.object_type,
+        row.object_type_description,
+    )
+
+    normalized_requested_type = (object_type or "").upper()
+
+    if normalized_requested_type not in ["OBJECT", "ANY", type_config["type"]]:
+        raise ValueError(
+            f"Object type mismatch. Expected {normalized_requested_type}, found {type_config['type']}."
+        )
+
+    return {
+        "database_id": database_config.id,
+        "database": database_config.database,
+        "database_label": database_config.label,
+        "schema": row.schema_name,
+        "name": row.object_name,
+        "full_name": f"{row.schema_name}.{row.object_name}",
+        "sql_type": row.object_type,
+        "sql_type_description": row.object_type_description,
+        "type": type_config["type"],
+        "type_label": type_config["type_label"],
+        "family": type_config["family"],
+        "family_label": type_config["family_label"],
+        "supports_preview": type_config["supports_preview"],
+        "supports_definition": type_config["supports_definition"],
+        "create_date": row.create_date.isoformat() if row.create_date else None,
+        "modify_date": row.modify_date.isoformat() if row.modify_date else None,
+        "definition": row.definition or "",
+    }

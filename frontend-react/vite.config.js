@@ -1,9 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 
 export default defineConfig({
     plugins: [
         react(),
+        basicSsl(),
     ],
     server: {
         host: "0.0.0.0",
@@ -12,8 +14,14 @@ export default defineConfig({
         allowedHosts: [
             "localhost",
             "127.0.0.1",
-            "172.16.60.227",
+            "BMARTIN-AGP",
+            "bmartin-agp",
         ],
+        hmr: {
+            protocol: "wss",
+            host: "BMARTIN-AGP",
+            clientPort: 5173,
+        },
         proxy: {
             "/auth": {
                 target: "http://127.0.0.1:8000",

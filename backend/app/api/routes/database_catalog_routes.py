@@ -9,6 +9,8 @@ from app.services.database_service import (
     get_database_summary_by_id,
     get_tables_by_database_id,
     get_table_preview_by_database_id,
+    get_database_objects_by_id,
+    get_database_object_definition_by_id,
 )
 
 
@@ -109,5 +111,43 @@ def database_table_preview(
             table_name=table_name,
             start_record=start_record,
             end_record=end_record,
+        ),
+    }
+@router.get("/{database_id}/objects")
+def database_objects(
+    database_id: str,
+    request: Request,
+    session=Depends(require_session),
+    frontend=Depends(require_frontend_request),
+):
+    require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
+
+    objects = get_database_objects_by_id(database_id)
+
+    return {
+        "status": "ok",
+        "data": objects,
+    }
+
+
+@router.get("/{database_id}/objects/{object_type}/{schema_name}/{object_name}/definition")
+def database_object_definition(
+    database_id: str,
+    object_type: str,
+    schema_name: str,
+    object_name: str,
+    request: Request,
+    session=Depends(require_session),
+    frontend=Depends(require_frontend_request),
+):
+    require_roles(session, [ROLE_ADMIN, ROLE_ANALYST])
+
+    return {
+        "status": "ok",
+        "data": get_database_object_definition_by_id(
+            database_id=database_id,
+            object_type=object_type,
+            schema_name=schema_name,
+            object_name=object_name,
         ),
     }

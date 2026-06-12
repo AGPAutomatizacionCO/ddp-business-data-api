@@ -40,7 +40,7 @@ function App() {
         }
 
         await instance.logoutRedirect({
-            postLogoutRedirectUri: "http://localhost:5173",
+            postLogoutRedirectUri: "https://BMARTIN-AGP:5173",
         });
     }
 
