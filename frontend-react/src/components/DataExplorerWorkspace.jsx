@@ -78,6 +78,24 @@ const OBJECT_TYPE_CONFIG = {
         supportsPreview: false,
         supportsDefinition: false,
     },
+        CONSTRAINT: {
+        label: "Restricción",
+        shortLabel: "Restricción",
+        family: "Estructura SQL",
+        icon: "◆",
+        className: "object-constraint",
+        supportsPreview: false,
+        supportsDefinition: true,
+    },
+    RULE: {
+        label: "Regla",
+        shortLabel: "Regla",
+        family: "Estructura SQL",
+        icon: "◇",
+        className: "object-rule",
+        supportsPreview: false,
+        supportsDefinition: true,
+    },
 };
 
 const OBJECT_TYPE_ORDER = [
@@ -86,6 +104,8 @@ const OBJECT_TYPE_ORDER = [
     "PROCEDURE",
     "FUNCTION",
     "TRIGGER",
+    "CONSTRAINT",
+    "RULE",
     "SYNONYM",
     "SEQUENCE",
     "OTHER",
@@ -748,6 +768,7 @@ function DataExplorerWorkspace({
 
     const objectContent =
         definitionData?.definition ||
+        activeObject?.definition_preview ||
         activeObject?.base_object_name ||
         buildMetadataContent(activeObject);
 

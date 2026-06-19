@@ -684,12 +684,36 @@ def normalize_database_object_type(
         "SQL_TRIGGER": "TRIGGER",
         "CLR_TRIGGER": "TRIGGER",
 
+        "PK": "CONSTRAINT",
+        "PRIMARY_KEY_CONSTRAINT": "CONSTRAINT",
+        "PRIMARY KEY CONSTRAINT": "CONSTRAINT",
+
+        "F": "CONSTRAINT",
+        "FOREIGN_KEY_CONSTRAINT": "CONSTRAINT",
+        "FOREIGN KEY CONSTRAINT": "CONSTRAINT",
+
+        "UQ": "CONSTRAINT",
+        "UNIQUE_CONSTRAINT": "CONSTRAINT",
+        "UNIQUE CONSTRAINT": "CONSTRAINT",
+
+        "C": "CONSTRAINT",
+        "CHECK_CONSTRAINT": "CONSTRAINT",
+        "CHECK CONSTRAINT": "CONSTRAINT",
+
+        "D": "CONSTRAINT",
+        "DEFAULT_CONSTRAINT": "CONSTRAINT",
+        "DEFAULT CONSTRAINT": "CONSTRAINT",
+
         "SN": "SYNONYM",
         "SYNONYM": "SYNONYM",
 
         "SO": "SEQUENCE",
         "SEQUENCE_OBJECT": "SEQUENCE",
+        "SEQUENCE OBJECT": "SEQUENCE",
         "SEQUENCE": "SEQUENCE",
+
+        "R": "RULE",
+        "RULE": "RULE",
     }
 
     normalized_type = aliases.get(raw_sql_type)
@@ -738,6 +762,14 @@ def normalize_database_object_type(
             "supports_preview": False,
             "supports_definition": True,
         },
+        "CONSTRAINT": {
+            "type": "CONSTRAINT",
+            "type_label": "Restricción",
+            "family": "STRUCTURE",
+            "family_label": "Estructura SQL",
+            "supports_preview": False,
+            "supports_definition": True,
+        },
         "SYNONYM": {
             "type": "SYNONYM",
             "type_label": "Sinónimo",
@@ -754,6 +786,14 @@ def normalize_database_object_type(
             "supports_preview": False,
             "supports_definition": False,
         },
+        "RULE": {
+            "type": "RULE",
+            "type_label": "Regla",
+            "family": "STRUCTURE",
+            "family_label": "Estructura SQL",
+            "supports_preview": False,
+            "supports_definition": True,
+        },
     }
 
     if normalized_type in type_map:
@@ -767,7 +807,7 @@ def normalize_database_object_type(
         "family": "SUPPORT",
         "family_label": "Soporte",
         "supports_preview": False,
-        "supports_definition": False,
+        "supports_definition": True,
     }
 
 def get_database_objects_by_id(database_id: str) -> list[dict]:
@@ -782,27 +822,19 @@ def get_database_objects_by_id(database_id: str) -> list[dict]:
             o.type_desc AS object_type_description,
             o.create_date,
             o.modify_date,
-            CAST(NULL AS NVARCHAR(MAX)) AS base_object_name
+            CAST(NULL AS NVARCHAR(MAX)) AS base_object_name,
+            m.definition AS object_definition
         FROM sys.objects o
         INNER JOIN sys.schemas s
             ON o.schema_id = s.schema_id
-        WHERE o.type IN (
-            'U',   -- user table
-            'V',   -- view
-            'P',   -- stored procedure
-            'PC',  -- CLR stored procedure
-            'X',   -- extended procedure
-            'FN',  -- scalar function
-            'IF',  -- inline table-valued function
-            'TF',  -- table-valued function
-            'FS',  -- CLR scalar function
-            'FT',  -- CLR table-valued function
-            'TR',  -- trigger
-            'TA',  -- CLR trigger
-            'SN',  -- synonym
-            'SO'   -- sequence
-        )
-        AND o.is_ms_shipped = 0
+        LEFT JOIN sys.sql_modules m
+            ON o.object_id = m.object_id
+        WHERE
+            o.is_ms_shipped = 0
+            AND o.type NOT IN (
+                'S',   -- system table
+                'IT'   -- internal table
+            )
 
         UNION ALL
 
@@ -813,7 +845,8 @@ def get_database_objects_by_id(database_id: str) -> list[dict]:
             'SYNONYM' AS object_type_description,
             syn.create_date,
             syn.modify_date,
-            syn.base_object_name
+            syn.base_object_name,
+            CAST(syn.base_object_name AS NVARCHAR(MAX)) AS object_definition
         FROM sys.synonyms syn
         INNER JOIN sys.schemas s
             ON syn.schema_id = s.schema_id
@@ -862,6 +895,8 @@ def get_database_objects_by_id(database_id: str) -> list[dict]:
                 "has_sensitive_data": False,
                 "sensitive_columns_count": 0,
                 "sensitive_columns": [],
+                "definition_preview": row.object_definition or None,
+                "has_definition": bool(row.object_definition),
             }
         )
 

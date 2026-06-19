@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 
 from app.core.access_control import ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER, require_roles
+from app.core.audit_logger import write_audit_event
 from app.core.database_catalog import get_database_catalog
 from app.core.request_guard import require_frontend_request
 from app.core.session import require_session
@@ -20,6 +21,41 @@ router = APIRouter(
 )
 
 
+def get_session_user_info(session) -> dict:
+    """
+    Extrae información segura del usuario para auditoría.
+    No debe incluir tokens ni información sensible.
+    Soporta sesión como dict u objeto.
+    """
+    if session is None:
+        return {}
+
+    if isinstance(session, dict):
+        user = session.get("user", session)
+
+        if isinstance(user, dict):
+            return {
+                "name": user.get("name"),
+                "email": user.get("email") or user.get("preferred_username"),
+                "role": user.get("role"),
+                "roles": user.get("roles"),
+            }
+
+        return {
+            "session": str(session),
+        }
+
+    user = getattr(session, "user", session)
+
+    return {
+        "name": getattr(user, "name", None),
+        "email": getattr(user, "email", None)
+        or getattr(user, "preferred_username", None),
+        "role": getattr(user, "role", None),
+        "roles": getattr(user, "roles", None),
+    }
+
+
 @router.get("")
 def list_databases(
     request: Request,
@@ -27,6 +63,20 @@ def list_databases(
     frontend=Depends(require_frontend_request),
 ):
     require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
+
+    write_audit_event(
+        event_type="DATABASES_READ",
+        category="catalog",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "resource_type": "database_catalog",
+        },
+        result="ok",
+        details={
+            "message": "Consulta de catálogo de bases configuradas.",
+        },
+    )
 
     return {
         "status": "ok",
@@ -43,7 +93,25 @@ def database_health(
 ):
     require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
 
-    return check_database_connection_by_id(database_id)
+    result = check_database_connection_by_id(database_id)
+
+    write_audit_event(
+        event_type="DATABASE_HEALTH_READ",
+        category="catalog",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "database_id": database_id,
+            "resource_type": "database_health",
+        },
+        result="ok" if result.get("status") == "ok" else "error",
+        details={
+            "database_status": result.get("status"),
+            "message": result.get("message"),
+        },
+    )
+
+    return result
 
 
 @router.get("/{database_id}/summary")
@@ -66,6 +134,22 @@ def database_summary(
     if db_status["status"] == "ok":
         summary = get_database_summary_by_id(database_id)
 
+    write_audit_event(
+        event_type="DATABASE_SUMMARY_READ",
+        category="catalog",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "database_id": database_id,
+            "resource_type": "database_summary",
+        },
+        result="ok" if db_status.get("status") == "ok" else "error",
+        details={
+            "database_status": db_status.get("status"),
+            "summary": summary,
+        },
+    )
+
     return {
         "api": {
             "status": "ok",
@@ -86,10 +170,29 @@ def database_tables(
 ):
     require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
 
+    tables = get_tables_by_database_id(database_id)
+
+    write_audit_event(
+        event_type="DATABASE_TABLES_READ",
+        category="catalog",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "database_id": database_id,
+            "resource_type": "database_tables",
+        },
+        result="ok",
+        details={
+            "items_count": len(tables),
+        },
+    )
+
     return {
         "status": "ok",
-        "data": get_tables_by_database_id(database_id),
+        "data": tables,
     }
+
+
 @router.get("/{database_id}/tables/{schema_name}/{table_name}/preview")
 def database_table_preview(
     database_id: str,
@@ -103,16 +206,39 @@ def database_table_preview(
 ):
     require_roles(session, [ROLE_ADMIN, ROLE_ANALYST])
 
+    preview_data = get_table_preview_by_database_id(
+        database_id=database_id,
+        schema_name=schema_name,
+        table_name=table_name,
+        start_record=start_record,
+        end_record=end_record,
+    )
+
+    write_audit_event(
+        event_type="DATABASE_TABLE_PREVIEW_READ",
+        category="preview",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "database_id": database_id,
+            "schema_name": schema_name,
+            "table_name": table_name,
+            "resource_type": "table_preview",
+        },
+        result="ok",
+        details={
+            "start_record": start_record,
+            "end_record": end_record,
+            "returned_rows": len(preview_data) if isinstance(preview_data, list) else None,
+        },
+    )
+
     return {
         "status": "ok",
-        "data": get_table_preview_by_database_id(
-            database_id=database_id,
-            schema_name=schema_name,
-            table_name=table_name,
-            start_record=start_record,
-            end_record=end_record,
-        ),
+        "data": preview_data,
     }
+
+
 @router.get("/{database_id}/objects")
 def database_objects(
     database_id: str,
@@ -123,6 +249,21 @@ def database_objects(
     require_roles(session, [ROLE_ADMIN, ROLE_ANALYST, ROLE_VIEWER])
 
     objects = get_database_objects_by_id(database_id)
+
+    write_audit_event(
+        event_type="DATABASE_OBJECTS_READ",
+        category="catalog",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "database_id": database_id,
+            "resource_type": "database_objects",
+        },
+        result="ok",
+        details={
+            "items_count": len(objects),
+        },
+    )
 
     return {
         "status": "ok",
@@ -142,12 +283,36 @@ def database_object_definition(
 ):
     require_roles(session, [ROLE_ADMIN, ROLE_ANALYST])
 
+    definition = get_database_object_definition_by_id(
+        database_id=database_id,
+        object_type=object_type,
+        schema_name=schema_name,
+        object_name=object_name,
+    )
+
+    write_audit_event(
+        event_type="DATABASE_OBJECT_DEFINITION_READ",
+        category="catalog",
+        request=request,
+        user=get_session_user_info(session),
+        resource={
+            "database_id": database_id,
+            "schema_name": schema_name,
+            "object_name": object_name,
+            "object_type": object_type,
+            "resource_type": "object_definition",
+        },
+        result="ok",
+        details={
+            "has_definition": bool(
+                definition.get("definition")
+                if isinstance(definition, dict)
+                else definition
+            ),
+        },
+    )
+
     return {
         "status": "ok",
-        "data": get_database_object_definition_by_id(
-            database_id=database_id,
-            object_type=object_type,
-            schema_name=schema_name,
-            object_name=object_name,
-        ),
+        "data": definition,
     }

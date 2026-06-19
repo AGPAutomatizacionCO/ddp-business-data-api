@@ -15,6 +15,53 @@ import OverviewView from "../views/OverviewView.jsx";
 import AuditView from "../views/AuditView.jsx";
 import SourcesView from "../views/SourcesView.jsx";
 
+function normalizeRoleValue(value) {
+    return String(value || "")
+        .trim()
+        .toUpperCase();
+}
+
+function getUserRoleValues(user) {
+    if (!user) {
+        return [];
+    }
+
+    const roleCandidates = [
+        user.role,
+        user.app_role,
+        user.role_name,
+        user.backend_role,
+        user.profile?.role,
+        user.user?.role,
+    ];
+
+    if (Array.isArray(user.roles)) {
+        roleCandidates.push(...user.roles);
+    }
+
+    if (Array.isArray(user.permissions)) {
+        roleCandidates.push(...user.permissions);
+    }
+
+    return roleCandidates
+        .filter(Boolean)
+        .map(normalizeRoleValue);
+}
+
+function isAdminUser(user) {
+    const roleValues = getUserRoleValues(user);
+
+    return roleValues.some((role) =>
+        [
+            "ADMIN",
+            "ADMINISTRATOR",
+            "SUPERADMIN",
+            "ROLE_ADMIN",
+            "DDP_ADMIN",
+        ].includes(role)
+    );
+}
+
 function normalizeTable(database, table, index) {
     const schema =
         table.schema ||
@@ -85,13 +132,8 @@ function normalizeObject(database, object, index) {
         object.OBJECT_TYPE_DESCRIPTION ||
         "Objeto";
 
-    const family =
-        object.family ||
-        "SUPPORT";
-
-    const familyLabel =
-        object.family_label ||
-        "Soporte";
+    const family = object.family || "SUPPORT";
+    const familyLabel = object.family_label || "Soporte";
 
     const fullName =
         object.full_name ||
@@ -201,6 +243,10 @@ function DashboardPage({ user, onLogout }) {
     const [activeView, setActiveView] = useState("explorer");
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+    const userIsAdmin = isAdminUser(user);
+
+    const catalogObjects = allObjects.length > 0 ? allObjects : allTables;
+
     const selectedDatabase = useMemo(() => {
         return databases.find((database) => database.id === selectedDatabaseId);
     }, [databases, selectedDatabaseId]);
@@ -302,23 +348,15 @@ function DashboardPage({ user, onLogout }) {
                     summariesByDatabase[database.id] = databaseData.summary;
 
                     databaseData.tables.forEach((table, index) => {
-                        const normalizedTable = normalizeTable(
-                            database,
-                            table,
-                            index
+                        tablesFromAllDatabases.push(
+                            normalizeTable(database, table, index)
                         );
-
-                        tablesFromAllDatabases.push(normalizedTable);
                     });
 
                     databaseData.objects.forEach((object, index) => {
-                        const normalizedObject = normalizeObject(
-                            database,
-                            object,
-                            index
+                        objectsFromAllDatabases.push(
+                            normalizeObject(database, object, index)
                         );
-
-                        objectsFromAllDatabases.push(normalizedObject);
                     });
                 } catch (catalogError) {
                     console.warn(
@@ -342,63 +380,23 @@ function DashboardPage({ user, onLogout }) {
                 }
             }
 
-            /*
-             * Si el backend todavía no devuelve objetos para una base,
-             * usamos las tablas como objetos tipo TABLE para que el explorador
-             * pueda seguir funcionando de forma unificada.
-             */
-            const objectKeys = new Set(
-                objectsFromAllDatabases.map(
-                    (object) =>
-                        `${object.database_id}.${object.type}.${object.schema}.${object.name}`
-                )
-            );
-
-            tablesFromAllDatabases.forEach((table, index) => {
-                const tableObjectKey = `${table.database_id}.TABLE.${table.schema}.${table.name}`;
-
-                if (!objectKeys.has(tableObjectKey)) {
-                    objectsFromAllDatabases.push({
-                        ...table,
-                        type: "TABLE",
-                        type_label: "Tabla",
-                        family: "DATA",
-                        family_label: "Datos",
-                        supports_preview: true,
-                        supports_definition: false,
-                        row_key: `${table.database_id}.TABLE.${table.schema}.${table.name}.fallback.${index}`,
-                    });
-                }
-            });
-
             setDatabaseSummaries(summariesByDatabase);
             setAllTables(tablesFromAllDatabases);
             setAllObjects(objectsFromAllDatabases);
 
-            if (!selectedObject && objectsFromAllDatabases.length > 0) {
+            const nextCatalogObjects =
+                objectsFromAllDatabases.length > 0
+                    ? objectsFromAllDatabases
+                    : tablesFromAllDatabases;
+
+            if (!selectedObject && nextCatalogObjects.length > 0) {
                 const firstObjectForSelectedDatabase =
-                    objectsFromAllDatabases.find(
-                        (object) =>
-                            object.database_id === nextSelectedDatabaseId
-                    ) || objectsFromAllDatabases[0];
+                    nextCatalogObjects.find(
+                        (item) => item.database_id === nextSelectedDatabaseId
+                    ) || nextCatalogObjects[0];
 
                 setSelectedObject(firstObjectForSelectedDatabase);
-
-                if (
-                    firstObjectForSelectedDatabase.type === "TABLE" ||
-                    firstObjectForSelectedDatabase.type === "VIEW"
-                ) {
-                    const matchingTable = tablesFromAllDatabases.find(
-                        (table) =>
-                            table.database_id ===
-                                firstObjectForSelectedDatabase.database_id &&
-                            table.schema ===
-                                firstObjectForSelectedDatabase.schema &&
-                            table.name === firstObjectForSelectedDatabase.name
-                    );
-
-                    setSelectedTable(matchingTable || null);
-                }
+                setSelectedTable(firstObjectForSelectedDatabase);
             }
 
             setDashboardStatus("Dashboard cargado correctamente.");
@@ -409,9 +407,6 @@ function DashboardPage({ user, onLogout }) {
             setDatabaseSummaries({});
             setAllTables([]);
             setAllObjects([]);
-            setSelectedTable(null);
-            setSelectedObject(null);
-
             setDashboardError(
                 loadError.message || "No fue posible cargar el dashboard."
             );
@@ -425,51 +420,13 @@ function DashboardPage({ user, onLogout }) {
         setSelectedObject(null);
     }
 
-    function handleSelectObject(object) {
-        setSelectedObject(object);
-
-        if (object?.type === "TABLE" || object?.type === "VIEW") {
-            const matchingTable = allTables.find(
-                (table) =>
-                    table.database_id === object.database_id &&
-                    table.schema === object.schema &&
-                    table.name === object.name
-            );
-
-            setSelectedTable(matchingTable || null);
-            return;
-        }
-
-        setSelectedTable(null);
-    }
-
-    function handleSelectTable(table) {
-        setSelectedTable(table);
-
-        const matchingObject = allObjects.find(
-            (object) =>
-                object.database_id === table.database_id &&
-                object.schema === table.schema &&
-                object.name === table.name &&
-                (object.type === "TABLE" || object.type === "VIEW")
-        );
-
-        if (matchingObject) {
-            setSelectedObject(matchingObject);
-        }
-    }
-
-    function isAdminUser() {
-        return String(user?.role || "").trim().toUpperCase() === "ADMIN";
-    }
-
     function renderOverviewView() {
         return (
             <OverviewView
                 user={user}
                 databases={databases}
                 databaseSummaries={databaseSummaries}
-                allTables={allTables}
+                allTables={catalogObjects}
                 dashboardStatus={dashboardStatus}
                 dashboardError={dashboardError}
                 onOpenExplorer={() => setActiveView("explorer")}
@@ -484,15 +441,18 @@ function DashboardPage({ user, onLogout }) {
         }
 
         if (activeView === "audit") {
-            if (!isAdminUser()) {
-                return renderOverviewView();
-            }
-
-            return <AuditView />;
+            return (
+                <AuditView
+                    user={user}
+                    databases={databases}
+                    allTables={catalogObjects}
+                    dashboardStatus={dashboardStatus}
+                />
+            );
         }
 
         if (activeView === "sources") {
-            if (!isAdminUser()) {
+            if (!userIsAdmin) {
                 return renderOverviewView();
             }
 
@@ -500,7 +460,10 @@ function DashboardPage({ user, onLogout }) {
                 <SourcesView
                     databases={databases}
                     databaseSummaries={databaseSummaries}
-                    allTables={allTables}
+                    allTables={catalogObjects}
+                    dashboardStatus={dashboardStatus}
+                    dashboardError={dashboardError}
+                    onRefreshCatalog={loadMultiDatabaseCatalog}
                 />
             );
         }
@@ -519,8 +482,8 @@ function DashboardPage({ user, onLogout }) {
                 dashboardStatus={dashboardStatus}
                 dashboardError={dashboardError}
                 onDatabaseChange={handleDatabaseChange}
-                onSelectTable={handleSelectTable}
-                onSelectObject={handleSelectObject}
+                onSelectTable={setSelectedTable}
+                onSelectObject={setSelectedObject}
                 onLogout={onLogout}
                 onRefreshCatalog={loadMultiDatabaseCatalog}
             />

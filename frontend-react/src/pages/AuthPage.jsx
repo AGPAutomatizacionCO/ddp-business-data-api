@@ -1,117 +1,75 @@
 function AuthPage({ status, error, isRestoringSession, onLogin }) {
     return (
         <main className="auth-page">
-            <section className="auth-background-grid">
-                <div className="auth-glow auth-glow-one"></div>
-                <div className="auth-glow auth-glow-two"></div>
-            </section>
+            <section className="auth-hero">
+                <div className="auth-kicker">DDP Data Explorer · Gobierno de datos</div>
 
-            <section className="auth-layout">
-                <div className="auth-brand-panel">
-                    <div className="auth-logo-row">
-                        <div className="auth-logo">DDP</div>
+                <h1 className="auth-title">
+                    Exploración segura de datos empresariales
+                </h1>
 
-                        <div>
-                            <span>Data Explorer</span>
-                            <strong>Gobierno de datos</strong>
-                        </div>
+                <p className="auth-description">
+                    Acceso controlado a bases, esquemas, tablas y objetos de base
+                    de datos mediante autenticación corporativa, roles,
+                    trazabilidad, auditoría y gobierno de acceso.
+                </p>
+
+                <div className="auth-feature-grid">
+                    <div className="auth-feature-card">
+                        <strong>Microsoft Entra ID</strong>
+                        <span>Autenticación corporativa centralizada.</span>
                     </div>
 
-                    <div className="auth-hero-copy">
-                        <span className="auth-eyebrow">
-                            Plataforma interna
-                        </span>
-
-                        <h1>Exploración segura de datos empresariales</h1>
-
-                        <p>
-                            Acceso controlado a bases, esquemas y tablas mediante
-                            autenticación corporativa, roles, trazabilidad,
-                            auditoría y gobierno de acceso.
-                        </p>
+                    <div className="auth-feature-card">
+                        <strong>Roles y permisos</strong>
+                        <span>Control de acceso por perfil autorizado.</span>
                     </div>
 
-                    <div className="auth-feature-grid">
-                        <div>
-                            <strong>Microsoft Entra ID</strong>
-                            <span>Autenticación corporativa centralizada.</span>
-                        </div>
+                    <div className="auth-feature-card">
+                        <strong>Auditoría</strong>
+                        <span>Registro de accesos, consultas y bloqueos.</span>
+                    </div>
 
-                        <div>
-                            <strong>Roles y permisos</strong>
-                            <span>Control de acceso por perfil autorizado.</span>
-                        </div>
-
-                        <div>
-                            <strong>Auditoría</strong>
-                            <span>Registro de accesos, consultas y bloqueos.</span>
-                        </div>
-
-                        <div>
-                            <strong>Datos sensibles</strong>
-                            <span>Enmascaramiento desde backend seguro.</span>
-                        </div>
+                    <div className="auth-feature-card">
+                        <strong>Datos sensibles</strong>
+                        <span>Enmascaramiento desde backend seguro.</span>
                     </div>
                 </div>
+            </section>
 
-                <aside className="auth-login-panel">
-                    <div className="auth-login-card">
-                        <div className="auth-login-header">
-                            <span className="auth-lock-icon">●</span>
+            <section className="auth-panel">
+                <div className="auth-panel-badge">DDP</div>
 
-                            <div>
-                                <span>Acceso seguro</span>
-                                <h2>Iniciar sesión</h2>
-                            </div>
-                        </div>
+                <h2>Iniciar sesión</h2>
 
-                        <p className="auth-login-description">
-                            Usa tu cuenta corporativa para acceder a la
-                            herramienta. Todas las consultas pueden ser
-                            monitoreadas por seguridad y trazabilidad.
-                        </p>
+                <p>
+                    Usa tu cuenta corporativa para acceder a la herramienta.
+                    Todas las consultas pueden ser monitoreadas por seguridad y
+                    trazabilidad.
+                </p>
 
-                        <div className="auth-status-card">
-                            <span>Estado actual</span>
-                            <strong>{status}</strong>
-                        </div>
+                <div className="auth-status-box">
+                    <strong>Estado actual:</strong> {status}
+                </div>
 
-                        {error && (
-                            <div className="error-box auth-error-box">
-                                {error}
-                            </div>
-                        )}
+                {error && <div className="error-box">{error}</div>}
 
-                        <button
-                            type="button"
-                            className="auth-microsoft-button"
-                            onClick={onLogin}
-                            disabled={isRestoringSession}
-                        >
-                            <span className="microsoft-icon">
-                                <i></i>
-                                <i></i>
-                                <i></i>
-                                <i></i>
-                            </span>
+                <button
+                    className="primary-button auth-login-button"
+                    onClick={onLogin}
+                    disabled={isRestoringSession}
+                    type="button"
+                >
+                    {isRestoringSession
+                        ? "Validando sesión..."
+                        : "Continuar con Microsoft"}
+                </button>
 
-                            <strong>
-                                {isRestoringSession
-                                    ? "Validando sesión..."
-                                    : "Continuar con Microsoft"}
-                            </strong>
-                        </button>
-
-                        <div className="auth-compliance-note">
-                            <strong>Uso monitoreado</strong>
-                            <span>
-                                El acceso, los intentos bloqueados y las
-                                consultas realizadas pueden registrarse para
-                                auditoría, gobierno y soporte.
-                            </span>
-                        </div>
-                    </div>
-                </aside>
+                <div className="auth-note">
+                    El acceso, los intentos bloqueados y las consultas
+                    realizadas pueden registrarse para auditoría, gobierno y
+                    soporte.
+                </div>
             </section>
         </main>
     );

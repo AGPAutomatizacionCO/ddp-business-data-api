@@ -20,7 +20,9 @@ backend/.env
 backend/.env.*
 frontend/.env
 frontend/.env.*
-backend/logs/
+backend/logs/*.jsonl
+backend/logs/*.json
+!backend/logs/.gitkeep
 
 # Allow example env files
 !backend/.env.example

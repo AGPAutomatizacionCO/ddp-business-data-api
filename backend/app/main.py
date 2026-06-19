@@ -16,6 +16,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes.database_catalog_routes import router as database_catalog_router
+from app.api.routes.agent_catalog_routes import router as agent_catalog_router
+from app.api.routes.audit_routes import router as audit_router
 
 from app.core.errors import (
     http_exception_handler,
@@ -100,7 +102,8 @@ app.include_router(health_router)
 app.include_router(database_router)
 app.include_router(auth_router)
 app.include_router(database_catalog_router)
-
+app.include_router(agent_catalog_router)
+app.include_router(audit_router)
 
 app.mount(
     "/static",

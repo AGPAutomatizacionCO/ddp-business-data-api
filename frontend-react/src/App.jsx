@@ -22,22 +22,31 @@ function App() {
     async function handleLogin() {
         try {
             setError("");
-            setStatus("Redirigiendo a Microsoft...");
+            setStatus("Validando autenticación corporativa...");
 
-            await loginWithMicrosoft(instance);
+            const result = await loginWithMicrosoft(instance);
+
+            if (result?.backendSession?.user) {
+                setUser(result.backendSession.user);
+                setStatus("Sesión iniciada correctamente.");
+                return;
+            }
+
+            setStatus("Redirigiendo a Microsoft...");
         } catch (loginError) {
             console.error(loginError);
             setError(loginError.message || "No fue posible iniciar sesión.");
             setStatus("Error de autenticación.");
         }
     }
-
     async function handleLogout() {
         try {
             await closeBackendSession();
         } catch (logoutError) {
             console.warn(logoutError);
         }
+
+        setUser(null);
 
         await instance.logoutRedirect({
             postLogoutRedirectUri: "https://BMARTIN-AGP:5173",
@@ -52,7 +61,8 @@ function App() {
 
                 const result = await restoreMicrosoftSession(instance);
 
-                if (!result) {
+                if (!result?.backendSession?.user) {
+                    setUser(null);
                     setStatus(
                         "Frontend React activo. Inicia sesión para consultar datos."
                     );

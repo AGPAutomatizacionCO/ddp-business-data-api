@@ -217,3 +217,10 @@ export function getDatabaseObjectDefinition(
         `/api/databases/${databaseId}/objects/${objectType}/${schemaName}/${objectName}/definition`
     );
 }
+export function getAuditSummary() {
+    return apiGet("/api/audit/summary");
+}
+
+export function getAuditEvents(category = "audit", limit = 100) {
+    return apiGet(`/api/audit/events?category=${category}&limit=${limit}`);
+}

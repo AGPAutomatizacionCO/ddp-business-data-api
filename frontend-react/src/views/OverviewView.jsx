@@ -12,10 +12,22 @@ function getInitials(value) {
         .toUpperCase();
 }
 
-function countUniqueSchemasByDatabase(tables) {
-    return new Set(
-        tables.map((table) => `${table.database_id}.${table.schema}`)
-    ).size;
+function getTablesCountFromSummary(summary) {
+    return (
+        summary?.summary?.total_tables ||
+        summary?.data?.summary?.total_tables ||
+        summary?.total_tables ||
+        0
+    );
+}
+
+function getSchemasCountFromSummary(summary) {
+    return (
+        summary?.summary?.total_schemas ||
+        summary?.data?.summary?.total_schemas ||
+        summary?.total_schemas ||
+        0
+    );
 }
 
 function OverviewView({
@@ -28,94 +40,89 @@ function OverviewView({
     onOpenExplorer,
     onRefreshCatalog,
 }) {
+    const userName = user?.name || user?.username || "Usuario";
+    const userRole = user?.role || "Sin rol";
+
     const totalDatabases = databases.length;
+    const databasesWithError = databases.filter(
+        (database) => database.configuration_status === "error"
+    ).length;
+
+    const totalSchemas = new Set(
+        allTables.map((table) => `${table.database_id}.${table.schema}`)
+    ).size;
+
     const totalTables = allTables.length;
-    const totalSchemas = countUniqueSchemasByDatabase(allTables);
 
     const totalSensitiveTables = allTables.filter(
         (table) => table.has_sensitive_data
     ).length;
 
-    const connectedDatabases = databases.filter(
-        (database) => database.configuration_status !== "error"
-    ).length;
-
-    const errorDatabases = totalDatabases - connectedDatabases;
-
     return (
-        <main className="roadmap-view">
-            <section className="roadmap-hero">
-                <div>
-                    <span className="roadmap-eyebrow">
-                        Resumen ejecutivo
-                    </span>
+        <main className="overview-page">
+            <section className="overview-hero">
+                <div className="overview-kicker">Resumen ejecutivo</div>
 
-                    <h1>DDP Data Explorer</h1>
+                <h1 className="overview-title">DDP Data Explorer</h1>
 
-                    <p>
-                        Herramienta interna para exploración controlada de bases,
-                        esquemas y tablas, con autenticación corporativa,
-                        auditoría, roles y trazabilidad por recurso.
-                    </p>
-                </div>
+                <p className="overview-description">
+                    Herramienta interna para exploración controlada de bases,
+                    esquemas, tablas y objetos de base de datos, con
+                    autenticación corporativa, auditoría, roles y trazabilidad
+                    por recurso.
+                </p>
 
-                <div className="roadmap-user-card">
-                    <div className="drawer-avatar large">
-                        {getInitials(user?.name || user?.username)}
+                <div className="overview-user-row">
+                    <div className="overview-avatar">
+                        {getInitials(userName)}
                     </div>
 
                     <div>
-                        <span>Usuario autenticado</span>
-                        <strong>{user?.name || user?.username}</strong>
-                        <small>{user?.role || "Sin rol"}</small>
+                        <strong>{userName}</strong>
+                        <span>Usuario autenticado · {userRole}</span>
                     </div>
                 </div>
             </section>
 
-            {dashboardError && (
-                <div className="error-box">
-                    {dashboardError}
-                </div>
-            )}
-
-            <section className="roadmap-kpi-grid">
-                <div>
+            <section className="overview-kpi-grid">
+                <article className="overview-kpi-card">
                     <span>Bases conectadas</span>
-                    <strong>{connectedDatabases}</strong>
-                    <small>{errorDatabases} con error de configuración</small>
-                </div>
+                    <strong>{totalDatabases}</strong>
+                    <p>{databasesWithError} con error de configuración</p>
+                </article>
 
-                <div>
+                <article className="overview-kpi-card">
                     <span>Esquemas detectados</span>
                     <strong>{totalSchemas}</strong>
-                    <small>Conteo por fuente y esquema</small>
-                </div>
+                    <p>Conteo por fuente y esquema</p>
+                </article>
 
-                <div>
+                <article className="overview-kpi-card">
                     <span>Tablas indexadas</span>
                     <strong>{totalTables}</strong>
-                    <small>Catálogo técnico disponible</small>
-                </div>
+                    <p>Catálogo técnico disponible</p>
+                </article>
 
-                <div>
+                <article className="overview-kpi-card">
                     <span>Tablas sensibles</span>
                     <strong>{totalSensitiveTables}</strong>
-                    <small>Con columnas marcadas para control</small>
-                </div>
+                    <p>Con columnas marcadas para control</p>
+                </article>
             </section>
 
-            <section className="roadmap-next-panel">
-                <div>
-                    <span>Próximo paso recomendado</span>
-                    <h2>Cerrar flujo de consulta guiada y auditoría enriquecida</h2>
-                    <p>
-                        El siguiente hito es fortalecer la vista previa por tabla,
-                        registrar explícitamente cada acceso por base, esquema
-                        y tabla, y preparar el módulo visual de auditoría.
-                    </p>
-                </div>
+            <section className="overview-action-panel">
+                <span className="overview-kicker">Próximo paso recomendado</span>
 
-                <div className="roadmap-actions">
+                <h2>Cerrar flujo de consulta guiada y auditoría enriquecida</h2>
+
+                <p>
+                    El siguiente hito es fortalecer la vista previa por tabla,
+                    registrar explícitamente cada acceso por base, esquema y
+                    objeto, y preparar el módulo visual de auditoría para roles
+                    administrativos.
+                </p>
+
+                <div className="overview-actions">
                     <button
                         type="button"
                         className="primary-button"
@@ -134,46 +141,75 @@ function OverviewView({
                 </div>
             </section>
 
-            <section className="source-summary-table">
-                <div className="source-summary-header">
-                    <h2>Fuentes disponibles</h2>
-                    <p>{dashboardStatus}</p>
+            <section className="overview-sources-section">
+                <div className="overview-section-header">
+                    <div>
+                        <h2>Fuentes disponibles</h2>
+                        <p>{dashboardStatus}</p>
+                    </div>
                 </div>
 
-                <div className="source-list">
+                {dashboardError && (
+                    <div className="error-box">{dashboardError}</div>
+                )}
+
+                <div className="overview-source-grid">
                     {databases.map((database) => {
-                        const tablesForDatabase = allTables.filter(
-                            (table) => table.database_id === database.id
-                        );
+                        const summary = databaseSummaries[database.id];
 
-                        const schemaCount = new Set(
-                            tablesForDatabase.map((table) => table.schema)
-                        ).size;
+                        const tablesCount =
+                            allTables.filter(
+                                (table) => table.database_id === database.id
+                            ).length || getTablesCountFromSummary(summary);
 
-                        const tableCount = tablesForDatabase.length;
+                        const schemasCount =
+                            new Set(
+                                allTables
+                                    .filter(
+                                        (table) =>
+                                            table.database_id === database.id
+                                    )
+                                    .map((table) => table.schema)
+                            ).size || getSchemasCountFromSummary(summary);
+
+                        const hasError =
+                            database.configuration_status === "error" ||
+                            summary?.database?.status === "error" ||
+                            summary?.database?.status ===
+                                "configuration_error";
 
                         return (
-                            <div
-                                className="source-row"
+                            <article
+                                className={
+                                    hasError
+                                        ? "overview-source-card warning"
+                                        : "overview-source-card"
+                                }
                                 key={database.id}
                             >
-                                <div>
+                                <div className="overview-source-top">
                                     <strong>{database.label}</strong>
-                                    <span>
-                                        {database.database || database.name} ·{" "}
-                                        {database.environment || "sin ambiente"}
-                                    </span>
+                                    <mark>
+                                        {hasError ? "Revisar" : "Activa"}
+                                    </mark>
                                 </div>
 
-                                <small>
-                                    {schemaCount} esquemas · Owner:{" "}
-                                    {database.owner || "No definido"}
-                                </small>
+                                <span>
+                                    {database.database || database.name || "-"} ·{" "}
+                                    {database.environment || "local"}
+                                </span>
 
-                                <mark>
-                                    {tableCount} tablas
-                                </mark>
-                            </div>
+                                <div className="overview-source-meta">
+                                    <small>{schemasCount} esquemas</small>
+                                    <small>
+                                        Owner: {database.owner || "Not defined"}
+                                    </small>
+                                </div>
+
+                                <div className="overview-source-count">
+                                    {tablesCount} tablas
+                                </div>
+                            </article>
                         );
                     })}
                 </div>
