@@ -10,6 +10,7 @@ import {
 } from "../services/apiClient";
 
 import DashboardShell from "../components/DashboardShell.jsx";
+import CatalogLoadingOverlay from "../components/CatalogLoadingOverlay.jsx";
 import GuidedExplorerView from "../views/GuidedExplorerView.jsx";
 import OverviewView from "../views/OverviewView.jsx";
 import AuditView from "../views/AuditView.jsx";
@@ -43,9 +44,7 @@ function getUserRoleValues(user) {
         roleCandidates.push(...user.permissions);
     }
 
-    return roleCandidates
-        .filter(Boolean)
-        .map(normalizeRoleValue);
+    return roleCandidates.filter(Boolean).map(normalizeRoleValue);
 }
 
 function isAdminUser(user) {
@@ -60,6 +59,84 @@ function isAdminUser(user) {
             "DDP_ADMIN",
         ].includes(role)
     );
+}
+
+function getListFromResponse(response, preferredKey = "data") {
+    if (Array.isArray(response)) {
+        return response;
+    }
+
+    if (Array.isArray(response?.[preferredKey])) {
+        return response[preferredKey];
+    }
+
+    if (Array.isArray(response?.data)) {
+        return response.data;
+    }
+
+    if (Array.isArray(response?.data?.data)) {
+        return response.data.data;
+    }
+
+    if (Array.isArray(response?.data?.items)) {
+        return response.data.items;
+    }
+
+    if (Array.isArray(response?.data?.results)) {
+        return response.data.results;
+    }
+
+    if (Array.isArray(response?.data?.tables)) {
+        return response.data.tables;
+    }
+
+    if (Array.isArray(response?.data?.objects)) {
+        return response.data.objects;
+    }
+
+    if (Array.isArray(response?.items)) {
+        return response.items;
+    }
+
+    if (Array.isArray(response?.results)) {
+        return response.results;
+    }
+
+    if (Array.isArray(response?.tables)) {
+        return response.tables;
+    }
+
+    if (Array.isArray(response?.objects)) {
+        return response.objects;
+    }
+
+    if (Array.isArray(response?.result)) {
+        return response.result;
+    }
+
+    return [];
+}
+
+function getTablesFromResponse(response) {
+    const tables = getListFromResponse(response, "tables");
+
+    if (!Array.isArray(tables)) {
+        console.warn("No se pudieron extraer tablas desde la respuesta:", response);
+        return [];
+    }
+
+    return tables;
+}
+
+function getObjectsFromResponse(response) {
+    const objects = getListFromResponse(response, "objects");
+
+    if (!Array.isArray(objects)) {
+        console.warn("No se pudieron extraer objetos desde la respuesta:", response);
+        return [];
+    }
+
+    return objects;
 }
 
 function normalizeTable(database, table, index) {
@@ -135,9 +212,7 @@ function normalizeObject(database, object, index) {
     const family = object.family || "SUPPORT";
     const familyLabel = object.family_label || "Soporte";
 
-    const fullName =
-        object.full_name ||
-        `${schema}.${name}`;
+    const fullName = object.full_name || `${schema}.${name}`;
 
     return {
         ...object,
@@ -169,60 +244,40 @@ function normalizeObject(database, object, index) {
     };
 }
 
-function getTablesFromResponse(response) {
-    if (Array.isArray(response)) {
-        return response;
+function findFirstDatabaseWithCatalog({
+    currentDatabaseId,
+    databaseCatalog,
+    objectsFromAllDatabases,
+    tablesFromAllDatabases,
+}) {
+    const hasCatalogForCurrentDatabase =
+        Boolean(currentDatabaseId) &&
+        (
+            objectsFromAllDatabases.some(
+                (object) => object.database_id === currentDatabaseId
+            ) ||
+            tablesFromAllDatabases.some(
+                (table) => table.database_id === currentDatabaseId
+            )
+        );
+
+    if (hasCatalogForCurrentDatabase) {
+        return currentDatabaseId;
     }
 
-    if (Array.isArray(response?.data)) {
-        return response.data;
+    if (objectsFromAllDatabases.length > 0) {
+        return objectsFromAllDatabases[0].database_id;
     }
 
-    if (Array.isArray(response?.data?.data)) {
-        return response.data.data;
+    if (tablesFromAllDatabases.length > 0) {
+        return tablesFromAllDatabases[0].database_id;
     }
 
-    if (Array.isArray(response?.data?.tables)) {
-        return response.data.tables;
+    if (currentDatabaseId) {
+        return currentDatabaseId;
     }
 
-    if (Array.isArray(response?.tables)) {
-        return response.tables;
-    }
-
-    if (Array.isArray(response?.result)) {
-        return response.result;
-    }
-
-    console.warn("No se pudieron extraer tablas desde la respuesta:", response);
-
-    return [];
-}
-
-function getObjectsFromResponse(response) {
-    if (Array.isArray(response)) {
-        return response;
-    }
-
-    if (Array.isArray(response?.data)) {
-        return response.data;
-    }
-
-    if (Array.isArray(response?.data?.data)) {
-        return response.data.data;
-    }
-
-    if (Array.isArray(response?.objects)) {
-        return response.objects;
-    }
-
-    if (Array.isArray(response?.result)) {
-        return response.result;
-    }
-
-    console.warn("No se pudieron extraer objetos desde la respuesta:", response);
-
-    return [];
+    return databaseCatalog[0]?.id || "";
 }
 
 function DashboardPage({ user, onLogout }) {
@@ -230,6 +285,15 @@ function DashboardPage({ user, onLogout }) {
         "Cargando dashboard..."
     );
     const [dashboardError, setDashboardError] = useState("");
+
+    const [catalogLoadingState, setCatalogLoadingState] = useState({
+        isLoading: false,
+        phase: "",
+        message: "",
+        current: "",
+        completed: 0,
+        total: 0,
+    });
 
     const [databases, setDatabases] = useState([]);
     const [databaseSummaries, setDatabaseSummaries] = useState({});
@@ -251,10 +315,16 @@ function DashboardPage({ user, onLogout }) {
         return databases.find((database) => database.id === selectedDatabaseId);
     }, [databases, selectedDatabaseId]);
 
+    function updateCatalogLoadingState(nextState) {
+        setCatalogLoadingState((current) => ({
+            ...current,
+            ...nextState,
+        }));
+    }
+
     async function safeLoadObjects(database) {
         try {
             const objectsResult = await getDatabaseObjects(database.id);
-
             return getObjectsFromResponse(objectsResult);
         } catch (objectsError) {
             console.warn(
@@ -310,23 +380,46 @@ function DashboardPage({ user, onLogout }) {
             setDashboardError("");
             setDashboardStatus("Cargando catálogo de bases...");
 
+            setCatalogLoadingState({
+                isLoading: true,
+                phase: "Inicializando catálogo",
+                message: "Consultando fuentes configuradas y preparando la carga.",
+                current: "",
+                completed: 0,
+                total: 0,
+            });
+
             const databasesResult = await getDatabases();
-            const databaseCatalog = databasesResult.data || [];
+            const databaseCatalog = getListFromResponse(databasesResult);
 
             setDatabases(databaseCatalog);
+
+            updateCatalogLoadingState({
+                phase: "Fuentes detectadas",
+                message: `Se encontraron ${databaseCatalog.length} fuentes configuradas.`,
+                total: databaseCatalog.length,
+                completed: 0,
+            });
 
             let nextSelectedDatabaseId = selectedDatabaseId;
 
             if (!nextSelectedDatabaseId && databaseCatalog.length > 0) {
                 nextSelectedDatabaseId = databaseCatalog[0].id;
-                setSelectedDatabaseId(nextSelectedDatabaseId);
             }
 
             const summariesByDatabase = {};
             const tablesFromAllDatabases = [];
             const objectsFromAllDatabases = [];
 
-            for (const database of databaseCatalog) {
+            for (const [databaseIndex, database] of databaseCatalog.entries()) {
+                updateCatalogLoadingState({
+                    phase: "Cargando catálogo de base",
+                    message: "Consultando resumen, tablas y objetos SQL.",
+                    current: database.label || database.id,
+                    completed: databaseIndex,
+                    total: databaseCatalog.length,
+                });
+
                 if (database.configuration_status === "error") {
                     summariesByDatabase[database.id] = {
                         database: {
@@ -338,6 +431,11 @@ function DashboardPage({ user, onLogout }) {
                             total_schemas: 0,
                         },
                     };
+
+                    updateCatalogLoadingState({
+                        completed: databaseIndex + 1,
+                        current: database.label || database.id,
+                    });
 
                     continue;
                 }
@@ -378,8 +476,21 @@ function DashboardPage({ user, onLogout }) {
                         },
                     };
                 }
+
+                updateCatalogLoadingState({
+                    completed: databaseIndex + 1,
+                    current: database.label || database.id,
+                });
             }
 
+            nextSelectedDatabaseId = findFirstDatabaseWithCatalog({
+                currentDatabaseId: nextSelectedDatabaseId,
+                databaseCatalog,
+                objectsFromAllDatabases,
+                tablesFromAllDatabases,
+            });
+
+            setSelectedDatabaseId(nextSelectedDatabaseId);
             setDatabaseSummaries(summariesByDatabase);
             setAllTables(tablesFromAllDatabases);
             setAllObjects(objectsFromAllDatabases);
@@ -389,17 +500,40 @@ function DashboardPage({ user, onLogout }) {
                     ? objectsFromAllDatabases
                     : tablesFromAllDatabases;
 
-            if (!selectedObject && nextCatalogObjects.length > 0) {
+            const selectedObjectStillExists =
+                selectedObject &&
+                nextCatalogObjects.some(
+                    (item) => item.row_key === selectedObject.row_key
+                );
+
+            if (!selectedObjectStillExists) {
                 const firstObjectForSelectedDatabase =
                     nextCatalogObjects.find(
                         (item) => item.database_id === nextSelectedDatabaseId
-                    ) || nextCatalogObjects[0];
+                    ) || nextCatalogObjects[0] || null;
 
                 setSelectedObject(firstObjectForSelectedDatabase);
                 setSelectedTable(firstObjectForSelectedDatabase);
             }
 
-            setDashboardStatus("Dashboard cargado correctamente.");
+            setDashboardStatus(
+                `Dashboard cargado correctamente. Bases: ${databaseCatalog.length}, objetos: ${objectsFromAllDatabases.length}, tablas: ${tablesFromAllDatabases.length}.`
+            );
+
+            updateCatalogLoadingState({
+                phase: "Catálogo listo",
+                message: "La información fue cargada correctamente.",
+                completed: databaseCatalog.length,
+                total: databaseCatalog.length,
+                current: "Proceso completado",
+            });
+
+            window.setTimeout(() => {
+                setCatalogLoadingState((current) => ({
+                    ...current,
+                    isLoading: false,
+                }));
+            }, 650);
         } catch (loadError) {
             console.error(loadError);
 
@@ -407,10 +541,22 @@ function DashboardPage({ user, onLogout }) {
             setDatabaseSummaries({});
             setAllTables([]);
             setAllObjects([]);
+            setSelectedTable(null);
+            setSelectedObject(null);
+
             setDashboardError(
                 loadError.message || "No fue posible cargar el dashboard."
             );
             setDashboardStatus("Error cargando dashboard.");
+
+            setCatalogLoadingState((current) => ({
+                ...current,
+                isLoading: false,
+                phase: "Error cargando catálogo",
+                message:
+                    loadError.message ||
+                    "No fue posible cargar la información.",
+            }));
         }
     }
 
@@ -418,6 +564,11 @@ function DashboardPage({ user, onLogout }) {
         setSelectedDatabaseId(databaseId);
         setSelectedTable(null);
         setSelectedObject(null);
+    }
+
+    function handleSelectObject(object) {
+        setSelectedObject(object);
+        setSelectedTable(object);
     }
 
     function renderOverviewView() {
@@ -483,7 +634,7 @@ function DashboardPage({ user, onLogout }) {
                 dashboardError={dashboardError}
                 onDatabaseChange={handleDatabaseChange}
                 onSelectTable={setSelectedTable}
-                onSelectObject={setSelectedObject}
+                onSelectObject={handleSelectObject}
                 onLogout={onLogout}
                 onRefreshCatalog={loadMultiDatabaseCatalog}
             />
@@ -505,6 +656,8 @@ function DashboardPage({ user, onLogout }) {
             onChangeView={setActiveView}
             onLogout={onLogout}
         >
+            <CatalogLoadingOverlay loadingState={catalogLoadingState} />
+
             {renderActiveView()}
         </DashboardShell>
     );
