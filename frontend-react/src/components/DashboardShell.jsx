@@ -27,6 +27,13 @@ const NAV_ITEMS = [
         icon: "04",
         roles: ["ADMIN"],
     },
+    {
+        id: "queries",
+        label: "Consulta operativa",
+        description: "Constructor visual de consulta",
+        icon: "05",
+        roles: ["ADMIN", "ANALYST"],
+    },
 ];
 
 function getInitials(value) {

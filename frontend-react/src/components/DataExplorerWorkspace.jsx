@@ -653,6 +653,77 @@ function ContentCodeViewer({ content, object, allObjects }) {
     );
 }
 
+function DatabaseConnectPanel({ database, healthState, connectionState, onConnect }) {
+    const health = healthState?.status;
+    const conn = connectionState?.status;
+    const isLoading = conn === "loading";
+    const isError = conn === "error";
+    const canConnect = health === "active" && (conn === "idle" || isError);
+
+    return (
+        <div className="db-connect-panel">
+            <div className="db-health-status">
+                {health === "checking" && (
+                    <span className="health-badge checking">
+                        <span className="mini-spinner" /> Verificando acceso...
+                    </span>
+                )}
+                {health === "active" && !isLoading && !isError && (
+                    <span className="health-badge active">Base accesible</span>
+                )}
+                {health === "unreachable" && (
+                    <span className="health-badge unreachable">Sin acceso a la base</span>
+                )}
+            </div>
+
+            {isLoading && (
+                <div className="db-loading-state">
+                    <div className="db-loading-spinner" />
+                    <div>
+                        <strong>Cargando objetos...</strong>
+                        <span>Consultando tablas, vistas y objetos SQL.</span>
+                    </div>
+                </div>
+            )}
+
+            {isError && (
+                <div className="db-error-state">
+                    <strong>Error al conectar</strong>
+                    <p>{connectionState?.error}</p>
+                </div>
+            )}
+
+            {!isLoading && canConnect && (
+                <button
+                    type="button"
+                    className="db-connect-button"
+                    onClick={() => onConnect?.(database?.id)}
+                >
+                    Conectar y explorar
+                </button>
+            )}
+
+            {health === "unreachable" && (
+                <p className="db-connect-hint">
+                    Esta base no está disponible. Verifique la configuración del servidor.
+                </p>
+            )}
+
+            {health === "checking" && (
+                <p className="db-connect-hint">
+                    Comprobando si la base de datos está activa...
+                </p>
+            )}
+
+            {health === "active" && conn === "idle" && (
+                <p className="db-connect-hint">
+                    Haga clic en Conectar para cargar los esquemas y objetos de esta base.
+                </p>
+            )}
+        </div>
+    );
+}
+
 function DataExplorerWorkspace({
     user,
     databases,
@@ -668,6 +739,9 @@ function DataExplorerWorkspace({
     onSelectObject,
     onLogout,
     onRefreshCatalog,
+    healthStates = {},
+    connectionStates = {},
+    onConnectDatabase,
 }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [searchScope, setSearchScope] = useState("global");
@@ -937,7 +1011,17 @@ function DataExplorerWorkspace({
 
                     <div className="topbar-pill">
                         <span>DB</span>
-                        <strong>Conectada</strong>
+                        <strong>
+                            {connectionStates[selectedDatabaseId]?.status === "loaded"
+                                ? "Conectada"
+                                : connectionStates[selectedDatabaseId]?.status === "loading"
+                                ? "Conectando..."
+                                : healthStates[selectedDatabaseId]?.status === "active"
+                                ? "Sin conectar"
+                                : healthStates[selectedDatabaseId]?.status === "checking"
+                                ? "Verificando"
+                                : "Sin acceso"}
+                        </strong>
                     </div>
 
                     <div className="topbar-pill wide">
@@ -1110,17 +1194,26 @@ function DataExplorerWorkspace({
                         <div className="mini-kpi-grid">
                             <div>
                                 <span>Esquemas</span>
-                                <strong>{totalSchemas}</strong>
+                                <strong>
+                                    {connectionStates[selectedDatabaseId]?.status === "loaded"
+                                        ? totalSchemas : "—"}
+                                </strong>
                             </div>
 
                             <div>
                                 <span>Objetos</span>
-                                <strong>{totalObjects}</strong>
+                                <strong>
+                                    {connectionStates[selectedDatabaseId]?.status === "loaded"
+                                        ? totalObjects : "—"}
+                                </strong>
                             </div>
 
                             <div>
                                 <span>Lógica</span>
-                                <strong>{totalLogicObjects}</strong>
+                                <strong>
+                                    {connectionStates[selectedDatabaseId]?.status === "loaded"
+                                        ? totalLogicObjects : "—"}
+                                </strong>
                             </div>
                         </div>
                     </section>
@@ -1225,7 +1318,16 @@ function DataExplorerWorkspace({
                             </div>
                         )}
 
-                        {!isSearching && (
+                        {!isSearching && connectionStates[selectedDatabaseId]?.status !== "loaded" && (
+                            <DatabaseConnectPanel
+                                database={selectedDatabase}
+                                healthState={healthStates[selectedDatabaseId]}
+                                connectionState={connectionStates[selectedDatabaseId]}
+                                onConnect={onConnectDatabase}
+                            />
+                        )}
+
+                    {!isSearching && connectionStates[selectedDatabaseId]?.status === "loaded" && (
                             <>
                                 <h2 className="schema-section-title">
                                     Esquemas y objetos

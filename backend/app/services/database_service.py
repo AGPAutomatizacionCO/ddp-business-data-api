@@ -22,8 +22,6 @@ SENSITIVE_KEYWORDS = [
     "telefono",
     "celular",
     "mobile",
-    "document",
-    "documento",
     "cedula",
     "identification",
     "nit",

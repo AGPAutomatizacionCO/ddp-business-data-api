@@ -14,7 +14,12 @@ function getUserFriendlyApiError(status, code, message) {
     }
 
     if (code === "INVALID_MICROSOFT_TOKEN") {
-        return "No fue posible validar la sesión de Microsoft. Inicie sesión nuevamente.";
+        const detail =
+            message &&
+            !message.startsWith("API request failed")
+                ? ` (${message})`
+                : "";
+        return `No fue posible validar la sesión de Microsoft. Inicie sesión nuevamente.${detail}`;
     }
 
     if (code === "USER_NOT_ALLOWED") {
@@ -30,7 +35,7 @@ function getUserFriendlyApiError(status, code, message) {
     }
 
     if (code === "VALIDATION_ERROR") {
-        return "La solicitud contiene datos inválidos o incompletos.";
+        return message || "La solicitud contiene datos inválidos o incompletos.";
     }
 
     if (status === 401) {
@@ -57,11 +62,26 @@ function extractApiError(result, status) {
 
     const code = error?.code || result?.code || null;
 
-    const message =
+    let message =
         error?.message ||
         result?.detail ||
         result?.message ||
         `API request failed with status ${status}`;
+
+    // Format Pydantic validation details into readable per-field messages
+    if (Array.isArray(error?.details) && error.details.length > 0) {
+        const shown = error.details.slice(0, 6);
+        const lines = shown.map((d) => {
+            const field = Array.isArray(d.loc)
+                ? d.loc.filter((p) => p !== "body").join(" → ")
+                : null;
+            return field ? `• ${d.msg} (${field})` : `• ${d.msg}`;
+        });
+        if (error.details.length > 6) {
+            lines.push(`• … y ${error.details.length - 6} error(es) adicional(es)`);
+        }
+        message = lines.join("\n");
+    }
 
     const requestId =
         error?.request_id ||
@@ -180,6 +200,9 @@ export function getTables() {
 export function getDatabases() {
     return apiGet("/api/databases");
 }
+export function getDatabaseHealth(databaseId) {
+    return apiGet(`/api/databases/${databaseId}/health`);
+}
 export function getDatabaseSummary(databaseId) {
     return apiGet(`/api/databases/${databaseId}/summary`);
 }
@@ -223,4 +246,12 @@ export function getAuditSummary() {
 
 export function getAuditEvents(category = "audit", limit = 100) {
     return apiGet(`/api/audit/events?category=${category}&limit=${limit}`);
+}
+
+export function getQueryColumns(databaseId, schemaName, tableName) {
+    return apiGet(`/api/queries/${databaseId}/${schemaName}/${tableName}/columns`);
+}
+
+export function executeSimpleQuery(payload) {
+    return apiPost("/api/queries/execute", payload);
 }

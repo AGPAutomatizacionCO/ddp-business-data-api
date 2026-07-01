@@ -34,18 +34,26 @@ function OverviewView({
     user,
     databases,
     databaseSummaries,
+    healthStates = {},
+    connectionStates = {},
     allTables,
     dashboardStatus,
     dashboardError,
     onOpenExplorer,
     onRefreshCatalog,
+    onConnectDatabase,
 }) {
     const userName = user?.name || user?.username || "Usuario";
     const userRole = user?.role || "Sin rol";
 
     const totalDatabases = databases.length;
-    const databasesWithError = databases.filter(
-        (database) => database.configuration_status === "error"
+
+    const connectedCount = databases.filter(
+        (db) => connectionStates[db.id]?.status === "loaded"
+    ).length;
+
+    const accessibleCount = databases.filter(
+        (db) => healthStates[db.id]?.status === "active"
     ).length;
 
     const totalSchemas = new Set(
@@ -86,9 +94,9 @@ function OverviewView({
 
             <section className="overview-kpi-grid">
                 <article className="overview-kpi-card">
-                    <span>Bases conectadas</span>
+                    <span>Fuentes configuradas</span>
                     <strong>{totalDatabases}</strong>
-                    <p>{databasesWithError} con error de configuración</p>
+                    <p>{accessibleCount} accesibles · {connectedCount} conectadas</p>
                 </article>
 
                 <article className="overview-kpi-card">
@@ -156,42 +164,64 @@ function OverviewView({
                 <div className="overview-source-grid">
                     {databases.map((database) => {
                         const summary = databaseSummaries[database.id];
+                        const health = healthStates[database.id];
+                        const connection = connectionStates[database.id];
 
-                        const tablesCount =
-                            allTables.filter(
-                                (table) => table.database_id === database.id
-                            ).length || getTablesCountFromSummary(summary);
+                        const isConnected = connection?.status === "loaded";
+                        const isConnecting = connection?.status === "loading";
+                        const isHealthChecking = health?.status === "checking";
+                        const isAccessible = health?.status === "active";
+                        const isUnreachable = health?.status === "unreachable";
+                        const hasConfigError = database.configuration_status === "error";
+                        const canConnect = isAccessible && !isConnected && !isConnecting;
 
-                        const schemasCount =
-                            new Set(
-                                allTables
-                                    .filter(
-                                        (table) =>
-                                            table.database_id === database.id
-                                    )
-                                    .map((table) => table.schema)
-                            ).size || getSchemasCountFromSummary(summary);
+                        const tablesCount = isConnected
+                            ? allTables.filter((t) => t.database_id === database.id).length
+                            : null;
 
-                        const hasError =
-                            database.configuration_status === "error" ||
-                            summary?.database?.status === "error" ||
-                            summary?.database?.status ===
-                                "configuration_error";
+                        const schemasCount = isConnected
+                            ? new Set(
+                                  allTables
+                                      .filter((t) => t.database_id === database.id)
+                                      .map((t) => t.schema)
+                              ).size
+                            : null;
 
                         return (
                             <article
-                                className={
-                                    hasError
-                                        ? "overview-source-card warning"
-                                        : "overview-source-card"
-                                }
+                                className={[
+                                    "overview-source-card",
+                                    isConnected ? "connected" : "",
+                                    (isUnreachable || hasConfigError) ? "warning" : "",
+                                ]
+                                    .filter(Boolean)
+                                    .join(" ")}
                                 key={database.id}
                             >
                                 <div className="overview-source-top">
                                     <strong>{database.label}</strong>
-                                    <mark>
-                                        {hasError ? "Revisar" : "Activa"}
-                                    </mark>
+
+                                    <div className="overview-source-badges">
+                                        {isHealthChecking && (
+                                            <mark className="badge-checking">
+                                                <span className="mini-spinner-sm" /> Verificando
+                                            </mark>
+                                        )}
+                                        {isAccessible && !isConnected && !isConnecting && (
+                                            <mark className="badge-active">Accesible</mark>
+                                        )}
+                                        {isConnecting && (
+                                            <mark className="badge-loading">
+                                                <span className="mini-spinner-sm" /> Conectando
+                                            </mark>
+                                        )}
+                                        {isConnected && (
+                                            <mark className="badge-connected">Conectada</mark>
+                                        )}
+                                        {(isUnreachable || hasConfigError) && (
+                                            <mark className="badge-error">Sin acceso</mark>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <span>
@@ -200,15 +230,35 @@ function OverviewView({
                                 </span>
 
                                 <div className="overview-source-meta">
-                                    <small>{schemasCount} esquemas</small>
                                     <small>
-                                        Owner: {database.owner || "Not defined"}
+                                        {schemasCount !== null ? `${schemasCount} esquemas` : "—"}
                                     </small>
+                                    <small>Owner: {database.owner || "Not defined"}</small>
                                 </div>
 
                                 <div className="overview-source-count">
-                                    {tablesCount} tablas
+                                    {tablesCount !== null ? `${tablesCount} tablas` : "—"}
                                 </div>
+
+                                {canConnect && (
+                                    <button
+                                        type="button"
+                                        className="overview-connect-button"
+                                        onClick={() => onConnectDatabase?.(database.id)}
+                                    >
+                                        Conectar y explorar
+                                    </button>
+                                )}
+
+                                {isConnecting && (
+                                    <p className="overview-connecting">
+                                        Cargando esquemas y objetos...
+                                    </p>
+                                )}
+
+                                {health?.status === "unreachable" && health?.message && (
+                                    <p className="overview-error-hint">{health.message}</p>
+                                )}
                             </article>
                         );
                     })}

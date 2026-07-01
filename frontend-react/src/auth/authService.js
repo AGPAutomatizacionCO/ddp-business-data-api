@@ -1,3 +1,4 @@
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { createBackendSession, getBackendSession } from "../services/apiClient";
 import { loginRequest } from "./msalConfig";
 
@@ -82,6 +83,22 @@ export async function restoreMicrosoftSession(instance) {
         try {
             return await createSessionFromAccount(instance, existingAccount);
         } catch (tokenError) {
+            const code = tokenError?.errorCode || tokenError?.name || "";
+            const needsInteraction =
+                tokenError instanceof InteractionRequiredAuthError ||
+                code === "timed_out" ||
+                code === "interaction_required" ||
+                code === "login_required" ||
+                code === "consent_required";
+
+            if (needsInteraction) {
+                await instance.loginRedirect({
+                    ...loginRequest,
+                    prompt: "select_account",
+                });
+                return null;
+            }
+
             console.warn("No fue posible crear sesión backend con token silencioso.", tokenError);
         }
     }

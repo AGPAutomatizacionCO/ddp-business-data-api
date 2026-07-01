@@ -12,6 +12,7 @@ LOG_FILES = {
     "auth": "auth.jsonl",
     "catalog": "catalog.jsonl",
     "preview": "preview.jsonl",
+    "query": "query.jsonl",
     "access_denied": "access_denied.jsonl",
     "errors": "errors.jsonl",
     "admin": "admin.jsonl",

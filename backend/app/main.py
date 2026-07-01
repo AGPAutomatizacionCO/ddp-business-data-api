@@ -1,40 +1,64 @@
-from pathlib import Path
+import logging
 import uuid
+from contextlib import asynccontextmanager
 
+import pyodbc
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.database_routes import router as database_router
 from app.api.routes.health_routes import router as health_router
-from app.core.config import settings
-print("CORS ORIGINS:", settings.get_cors_allowed_origins())
-
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
 from app.api.routes.database_catalog_routes import router as database_catalog_router
 from app.api.routes.agent_catalog_routes import router as agent_catalog_router
 from app.api.routes.audit_routes import router as audit_router
+from app.api.routes.query_routes import router as query_router
 
+from app.core.config import settings
+from app.core.database_catalog import get_database_connection
 from app.core.errors import (
     http_exception_handler,
     unhandled_exception_handler,
-    validation_exception_handler
+    validation_exception_handler,
 )
+from app.services.database_service import build_connection_string_from_config
+
+logger = logging.getLogger(__name__)
 
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
-PROJECT_ROOT = BACKEND_DIR.parent
-FRONTEND_DIR = PROJECT_ROOT / "frontend"
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("[startup] DDP Business Data API iniciando.")
+
+    connection_ids = settings.get_database_connection_ids()
+
+    if not connection_ids:
+        logger.warning("[startup] No hay bases configuradas en DB_CONNECTIONS.")
+    else:
+        for db_id in connection_ids:
+            try:
+                config = get_database_connection(db_id)
+                conn_str = build_connection_string_from_config(config)
+
+                with pyodbc.connect(conn_str, timeout=5) as conn:
+                    conn.cursor().execute("SELECT 1")
+
+                logger.info(f"[startup] Base '{db_id}' ({config.database}) accesible.")
+            except Exception as exc:
+                logger.warning(f"[startup] Base '{db_id}' no accesible: {exc}")
+
+    yield
+
+    logger.info("[startup] DDP Business Data API detenida.")
 
 
 app = FastAPI(
     title="DDP Business Data API",
     description="API local para consultar datos empresariales de forma controlada.",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 app.add_exception_handler(
     StarletteHTTPException,
@@ -104,38 +128,5 @@ app.include_router(auth_router)
 app.include_router(database_catalog_router)
 app.include_router(agent_catalog_router)
 app.include_router(audit_router)
+app.include_router(query_router)
 
-app.mount(
-    "/static",
-    StaticFiles(directory=FRONTEND_DIR),
-    name="static"
-)
-
-app.mount(
-    "/styles",
-    StaticFiles(directory=FRONTEND_DIR / "styles"),
-    name="styles"
-)
-
-app.mount(
-    "/js",
-    StaticFiles(directory=FRONTEND_DIR / "js"),
-    name="js"
-)
-
-app.mount(
-    "/auth",
-    StaticFiles(directory=FRONTEND_DIR / "auth"),
-    name="auth"
-)
-
-app.mount(
-    "/services",
-    StaticFiles(directory=FRONTEND_DIR / "services"),
-    name="services"
-)
-
-
-@app.get("/")
-def root():
-    return FileResponse(FRONTEND_DIR / "index.html")

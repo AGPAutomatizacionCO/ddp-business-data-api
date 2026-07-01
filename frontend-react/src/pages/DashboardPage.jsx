@@ -2,167 +2,68 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
     getDatabases,
+    getDatabaseHealth,
     getDatabaseSummary,
     getDatabaseTables,
     getDatabaseObjects,
-    getHealthSummary,
-    getTables,
 } from "../services/apiClient";
 
 import DashboardShell from "../components/DashboardShell.jsx";
-import CatalogLoadingOverlay from "../components/CatalogLoadingOverlay.jsx";
 import GuidedExplorerView from "../views/GuidedExplorerView.jsx";
 import OverviewView from "../views/OverviewView.jsx";
 import AuditView from "../views/AuditView.jsx";
 import SourcesView from "../views/SourcesView.jsx";
+import OperativeQueryView from "../views/OperativeQueryView.jsx";
+
+// --- Utilities ---
 
 function normalizeRoleValue(value) {
-    return String(value || "")
-        .trim()
-        .toUpperCase();
+    return String(value || "").trim().toUpperCase();
 }
 
 function getUserRoleValues(user) {
-    if (!user) {
-        return [];
-    }
-
-    const roleCandidates = [
-        user.role,
-        user.app_role,
-        user.role_name,
-        user.backend_role,
-        user.profile?.role,
-        user.user?.role,
+    if (!user) return [];
+    const candidates = [
+        user.role, user.app_role, user.role_name, user.backend_role,
+        user.profile?.role, user.user?.role,
     ];
-
-    if (Array.isArray(user.roles)) {
-        roleCandidates.push(...user.roles);
-    }
-
-    if (Array.isArray(user.permissions)) {
-        roleCandidates.push(...user.permissions);
-    }
-
-    return roleCandidates.filter(Boolean).map(normalizeRoleValue);
+    if (Array.isArray(user.roles)) candidates.push(...user.roles);
+    if (Array.isArray(user.permissions)) candidates.push(...user.permissions);
+    return candidates.filter(Boolean).map(normalizeRoleValue);
 }
 
 function isAdminUser(user) {
-    const roleValues = getUserRoleValues(user);
-
-    return roleValues.some((role) =>
-        [
-            "ADMIN",
-            "ADMINISTRATOR",
-            "SUPERADMIN",
-            "ROLE_ADMIN",
-            "DDP_ADMIN",
-        ].includes(role)
+    return getUserRoleValues(user).some((r) =>
+        ["ADMIN", "ADMINISTRATOR", "SUPERADMIN", "ROLE_ADMIN", "DDP_ADMIN"].includes(r)
     );
 }
 
 function getListFromResponse(response, preferredKey = "data") {
-    if (Array.isArray(response)) {
-        return response;
-    }
-
-    if (Array.isArray(response?.[preferredKey])) {
-        return response[preferredKey];
-    }
-
-    if (Array.isArray(response?.data)) {
-        return response.data;
-    }
-
-    if (Array.isArray(response?.data?.data)) {
-        return response.data.data;
-    }
-
-    if (Array.isArray(response?.data?.items)) {
-        return response.data.items;
-    }
-
-    if (Array.isArray(response?.data?.results)) {
-        return response.data.results;
-    }
-
-    if (Array.isArray(response?.data?.tables)) {
-        return response.data.tables;
-    }
-
-    if (Array.isArray(response?.data?.objects)) {
-        return response.data.objects;
-    }
-
-    if (Array.isArray(response?.items)) {
-        return response.items;
-    }
-
-    if (Array.isArray(response?.results)) {
-        return response.results;
-    }
-
-    if (Array.isArray(response?.tables)) {
-        return response.tables;
-    }
-
-    if (Array.isArray(response?.objects)) {
-        return response.objects;
-    }
-
-    if (Array.isArray(response?.result)) {
-        return response.result;
-    }
-
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.[preferredKey])) return response[preferredKey];
+    if (Array.isArray(response?.data)) return response.data;
+    if (Array.isArray(response?.data?.data)) return response.data.data;
+    if (Array.isArray(response?.data?.items)) return response.data.items;
+    if (Array.isArray(response?.data?.tables)) return response.data.tables;
+    if (Array.isArray(response?.data?.objects)) return response.data.objects;
+    if (Array.isArray(response?.items)) return response.items;
+    if (Array.isArray(response?.tables)) return response.tables;
+    if (Array.isArray(response?.objects)) return response.objects;
     return [];
-}
-
-function getTablesFromResponse(response) {
-    const tables = getListFromResponse(response, "tables");
-
-    if (!Array.isArray(tables)) {
-        console.warn("No se pudieron extraer tablas desde la respuesta:", response);
-        return [];
-    }
-
-    return tables;
-}
-
-function getObjectsFromResponse(response) {
-    const objects = getListFromResponse(response, "objects");
-
-    if (!Array.isArray(objects)) {
-        console.warn("No se pudieron extraer objetos desde la respuesta:", response);
-        return [];
-    }
-
-    return objects;
 }
 
 function normalizeTable(database, table, index) {
     const schema =
-        table.schema ||
-        table.table_schema ||
-        table.TABLE_SCHEMA ||
-        table.schema_name ||
-        "unknown_schema";
-
+        table.schema || table.table_schema || table.TABLE_SCHEMA ||
+        table.schema_name || "unknown_schema";
     const name =
-        table.name ||
-        table.table_name ||
-        table.TABLE_NAME ||
-        table.table ||
-        `table_${index + 1}`;
-
-    const fullName =
-        table.full_name ||
-        table.fullName ||
-        `${schema}.${name}`;
+        table.name || table.table_name || table.TABLE_NAME ||
+        table.table || `table_${index + 1}`;
+    const fullName = table.full_name || table.fullName || `${schema}.${name}`;
 
     return {
         ...table,
-        schema,
-        name,
+        schema, name,
         full_name: fullName,
         database_id: database.id,
         database_label: database.label,
@@ -174,55 +75,32 @@ function normalizeTable(database, table, index) {
         has_sensitive_data: Boolean(table.has_sensitive_data),
         sensitive_columns_count: table.sensitive_columns_count || 0,
         sensitive_columns: table.sensitive_columns || [],
-        type: "TABLE",
-        type_label: "Tabla",
-        family: "DATA",
-        family_label: "Datos",
-        supports_preview: true,
-        supports_definition: false,
+        type: "TABLE", type_label: "Tabla",
+        family: "DATA", family_label: "Datos",
+        supports_preview: true, supports_definition: false,
         row_key: `${database.id}.TABLE.${schema}.${name}.${index}`,
     };
 }
 
 function normalizeObject(database, object, index) {
     const schema =
-        object.schema ||
-        object.schema_name ||
-        object.SCHEMA_NAME ||
-        "unknown_schema";
-
+        object.schema || object.schema_name || object.SCHEMA_NAME || "unknown_schema";
     const name =
-        object.name ||
-        object.object_name ||
-        object.OBJECT_NAME ||
-        `object_${index + 1}`;
-
-    const type =
-        object.type ||
-        object.object_type ||
-        object.OBJECT_TYPE ||
-        "OTHER";
-
+        object.name || object.object_name || object.OBJECT_NAME || `object_${index + 1}`;
+    const type = object.type || object.object_type || object.OBJECT_TYPE || "OTHER";
     const typeLabel =
-        object.type_label ||
-        object.object_type_description ||
-        object.OBJECT_TYPE_DESCRIPTION ||
-        "Objeto";
-
+        object.type_label || object.object_type_description ||
+        object.OBJECT_TYPE_DESCRIPTION || "Objeto";
     const family = object.family || "SUPPORT";
     const familyLabel = object.family_label || "Soporte";
-
     const fullName = object.full_name || `${schema}.${name}`;
 
     return {
         ...object,
-        schema,
-        name,
+        schema, name,
         full_name: fullName,
-        type,
-        type_label: typeLabel,
-        family,
-        family_label: familyLabel,
+        type, type_label: typeLabel,
+        family, family_label: familyLabel,
         database_id: database.id,
         database_label: database.label,
         environment: database.environment,
@@ -244,321 +122,222 @@ function normalizeObject(database, object, index) {
     };
 }
 
-function findFirstDatabaseWithCatalog({
-    currentDatabaseId,
-    databaseCatalog,
-    objectsFromAllDatabases,
-    tablesFromAllDatabases,
-}) {
-    const hasCatalogForCurrentDatabase =
-        Boolean(currentDatabaseId) &&
-        (
-            objectsFromAllDatabases.some(
-                (object) => object.database_id === currentDatabaseId
-            ) ||
-            tablesFromAllDatabases.some(
-                (table) => table.database_id === currentDatabaseId
-            )
-        );
-
-    if (hasCatalogForCurrentDatabase) {
-        return currentDatabaseId;
-    }
-
-    if (objectsFromAllDatabases.length > 0) {
-        return objectsFromAllDatabases[0].database_id;
-    }
-
-    if (tablesFromAllDatabases.length > 0) {
-        return tablesFromAllDatabases[0].database_id;
-    }
-
-    if (currentDatabaseId) {
-        return currentDatabaseId;
-    }
-
-    return databaseCatalog[0]?.id || "";
-}
+// --- Component ---
 
 function DashboardPage({ user, onLogout }) {
-    const [dashboardStatus, setDashboardStatus] = useState(
-        "Cargando dashboard..."
-    );
-    const [dashboardError, setDashboardError] = useState("");
-
-    const [catalogLoadingState, setCatalogLoadingState] = useState({
-        isLoading: false,
-        phase: "",
-        message: "",
-        current: "",
-        completed: 0,
-        total: 0,
-    });
-
+    // Catalog: just the list of configured databases (no DB connection needed)
     const [databases, setDatabases] = useState([]);
-    const [databaseSummaries, setDatabaseSummaries] = useState({});
-    const [allTables, setAllTables] = useState([]);
-    const [allObjects, setAllObjects] = useState([]);
+    const [catalogLoading, setCatalogLoading] = useState(false);
+    const [catalogError, setCatalogError] = useState("");
+
+    // Health state per database  (lightweight SELECT 1 check)
+    // { [id]: { status: 'checking' | 'active' | 'unreachable', database: string, message: string|null } }
+    const [healthStates, setHealthStates] = useState({});
+
+    // Connection state per database (tables + objects loaded on demand)
+    // { [id]: { status: 'idle' | 'loading' | 'loaded' | 'error', tables: [], objects: [], summary: null, error: null } }
+    const [connectionStates, setConnectionStates] = useState({});
 
     const [selectedDatabaseId, setSelectedDatabaseId] = useState("");
     const [selectedTable, setSelectedTable] = useState(null);
     const [selectedObject, setSelectedObject] = useState(null);
-
     const [activeView, setActiveView] = useState("explorer");
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const userIsAdmin = isAdminUser(user);
 
+    // --- Derived state ---
+
+    const allTables = useMemo(() =>
+        Object.values(connectionStates)
+            .filter((s) => s.status === "loaded")
+            .flatMap((s) => s.tables)
+    , [connectionStates]);
+
+    const allObjects = useMemo(() =>
+        Object.values(connectionStates)
+            .filter((s) => s.status === "loaded")
+            .flatMap((s) => s.objects)
+    , [connectionStates]);
+
+    const databaseSummaries = useMemo(() => {
+        const summaries = {};
+        for (const [id, state] of Object.entries(connectionStates)) {
+            if (state.summary) summaries[id] = state.summary;
+        }
+        return summaries;
+    }, [connectionStates]);
+
+    const selectedDatabase = useMemo(() =>
+        databases.find((db) => db.id === selectedDatabaseId)
+    , [databases, selectedDatabaseId]);
+
     const catalogObjects = allObjects.length > 0 ? allObjects : allTables;
 
-    const selectedDatabase = useMemo(() => {
-        return databases.find((database) => database.id === selectedDatabaseId);
-    }, [databases, selectedDatabaseId]);
+    const connectedCount = Object.values(connectionStates).filter(
+        (s) => s.status === "loaded"
+    ).length;
 
-    function updateCatalogLoadingState(nextState) {
-        setCatalogLoadingState((current) => ({
-            ...current,
-            ...nextState,
-        }));
-    }
+    const dashboardStatus = catalogLoading
+        ? "Cargando catálogo de fuentes..."
+        : catalogError
+        ? `Error: ${catalogError}`
+        : databases.length === 0
+        ? "Sin fuentes configuradas."
+        : `${databases.length} fuentes detectadas · ${connectedCount} conectadas`;
 
-    async function safeLoadObjects(database) {
+    // --- Load catalog (fast, just metadata — no DB connections) ---
+
+    async function loadCatalog() {
         try {
-            const objectsResult = await getDatabaseObjects(database.id);
-            return getObjectsFromResponse(objectsResult);
-        } catch (objectsError) {
-            console.warn(
-                `No fue posible cargar objetos para la base ${database.id}. Se continúa solo con tablas.`,
-                objectsError
-            );
-
-            return [];
-        }
-    }
-
-    async function loadDatabaseData(database) {
-        try {
-            const [summaryResult, tablesResult] = await Promise.all([
-                getDatabaseSummary(database.id),
-                getDatabaseTables(database.id),
-            ]);
-
-            const objects = await safeLoadObjects(database);
-
-            return {
-                summary: summaryResult,
-                tables: getTablesFromResponse(tablesResult),
-                objects,
-                usedFallback: false,
-            };
-        } catch (databaseError) {
-            console.warn(
-                `No fue posible cargar endpoints multi-base para ${database.id}`,
-                databaseError
-            );
-
-            if (database.id !== "main") {
-                throw databaseError;
-            }
-
-            const [summaryResult, tablesResult] = await Promise.all([
-                getHealthSummary(),
-                getTables(),
-            ]);
-
-            return {
-                summary: summaryResult,
-                tables: getTablesFromResponse(tablesResult),
-                objects: [],
-                usedFallback: true,
-            };
-        }
-    }
-
-    async function loadMultiDatabaseCatalog() {
-        try {
-            setDashboardError("");
-            setDashboardStatus("Cargando catálogo de bases...");
-
-            setCatalogLoadingState({
-                isLoading: true,
-                phase: "Inicializando catálogo",
-                message: "Consultando fuentes configuradas y preparando la carga.",
-                current: "",
-                completed: 0,
-                total: 0,
-            });
-
-            const databasesResult = await getDatabases();
-            const databaseCatalog = getListFromResponse(databasesResult);
-
-            setDatabases(databaseCatalog);
-
-            updateCatalogLoadingState({
-                phase: "Fuentes detectadas",
-                message: `Se encontraron ${databaseCatalog.length} fuentes configuradas.`,
-                total: databaseCatalog.length,
-                completed: 0,
-            });
-
-            let nextSelectedDatabaseId = selectedDatabaseId;
-
-            if (!nextSelectedDatabaseId && databaseCatalog.length > 0) {
-                nextSelectedDatabaseId = databaseCatalog[0].id;
-            }
-
-            const summariesByDatabase = {};
-            const tablesFromAllDatabases = [];
-            const objectsFromAllDatabases = [];
-
-            for (const [databaseIndex, database] of databaseCatalog.entries()) {
-                updateCatalogLoadingState({
-                    phase: "Cargando catálogo de base",
-                    message: "Consultando resumen, tablas y objetos SQL.",
-                    current: database.label || database.id,
-                    completed: databaseIndex,
-                    total: databaseCatalog.length,
-                });
-
-                if (database.configuration_status === "error") {
-                    summariesByDatabase[database.id] = {
-                        database: {
-                            status: "configuration_error",
-                            message: database.configuration_error,
-                        },
-                        summary: {
-                            total_tables: 0,
-                            total_schemas: 0,
-                        },
-                    };
-
-                    updateCatalogLoadingState({
-                        completed: databaseIndex + 1,
-                        current: database.label || database.id,
-                    });
-
-                    continue;
-                }
-
-                try {
-                    const databaseData = await loadDatabaseData(database);
-
-                    summariesByDatabase[database.id] = databaseData.summary;
-
-                    databaseData.tables.forEach((table, index) => {
-                        tablesFromAllDatabases.push(
-                            normalizeTable(database, table, index)
-                        );
-                    });
-
-                    databaseData.objects.forEach((object, index) => {
-                        objectsFromAllDatabases.push(
-                            normalizeObject(database, object, index)
-                        );
-                    });
-                } catch (catalogError) {
-                    console.warn(
-                        `No fue posible cargar la base ${database.id}`,
-                        catalogError
-                    );
-
-                    summariesByDatabase[database.id] = {
-                        database: {
-                            status: "error",
-                            message:
-                                catalogError.backendMessage ||
-                                catalogError.message ||
-                                "No fue posible cargar esta base.",
-                        },
-                        summary: {
-                            total_tables: 0,
-                            total_schemas: 0,
-                        },
-                    };
-                }
-
-                updateCatalogLoadingState({
-                    completed: databaseIndex + 1,
-                    current: database.label || database.id,
-                });
-            }
-
-            nextSelectedDatabaseId = findFirstDatabaseWithCatalog({
-                currentDatabaseId: nextSelectedDatabaseId,
-                databaseCatalog,
-                objectsFromAllDatabases,
-                tablesFromAllDatabases,
-            });
-
-            setSelectedDatabaseId(nextSelectedDatabaseId);
-            setDatabaseSummaries(summariesByDatabase);
-            setAllTables(tablesFromAllDatabases);
-            setAllObjects(objectsFromAllDatabases);
-
-            const nextCatalogObjects =
-                objectsFromAllDatabases.length > 0
-                    ? objectsFromAllDatabases
-                    : tablesFromAllDatabases;
-
-            const selectedObjectStillExists =
-                selectedObject &&
-                nextCatalogObjects.some(
-                    (item) => item.row_key === selectedObject.row_key
-                );
-
-            if (!selectedObjectStillExists) {
-                const firstObjectForSelectedDatabase =
-                    nextCatalogObjects.find(
-                        (item) => item.database_id === nextSelectedDatabaseId
-                    ) || nextCatalogObjects[0] || null;
-
-                setSelectedObject(firstObjectForSelectedDatabase);
-                setSelectedTable(firstObjectForSelectedDatabase);
-            }
-
-            setDashboardStatus(
-                `Dashboard cargado correctamente. Bases: ${databaseCatalog.length}, objetos: ${objectsFromAllDatabases.length}, tablas: ${tablesFromAllDatabases.length}.`
-            );
-
-            updateCatalogLoadingState({
-                phase: "Catálogo listo",
-                message: "La información fue cargada correctamente.",
-                completed: databaseCatalog.length,
-                total: databaseCatalog.length,
-                current: "Proceso completado",
-            });
-
-            window.setTimeout(() => {
-                setCatalogLoadingState((current) => ({
-                    ...current,
-                    isLoading: false,
-                }));
-            }, 650);
-        } catch (loadError) {
-            console.error(loadError);
-
-            setDatabases([]);
-            setDatabaseSummaries({});
-            setAllTables([]);
-            setAllObjects([]);
+            setCatalogLoading(true);
+            setCatalogError("");
             setSelectedTable(null);
             setSelectedObject(null);
 
-            setDashboardError(
-                loadError.message || "No fue posible cargar el dashboard."
-            );
-            setDashboardStatus("Error cargando dashboard.");
+            const result = await getDatabases();
+            const catalog = getListFromResponse(result);
+            setDatabases(catalog);
 
-            setCatalogLoadingState((current) => ({
-                ...current,
-                isLoading: false,
-                phase: "Error cargando catálogo",
-                message:
-                    loadError.message ||
-                    "No fue posible cargar la información.",
+            // Initialize all states
+            const initHealth = {};
+            const initConnection = {};
+            for (const db of catalog) {
+                initHealth[db.id] = {
+                    status: "checking",
+                    database: db.database,
+                    message: null,
+                };
+                initConnection[db.id] = {
+                    status: "idle",
+                    tables: [],
+                    objects: [],
+                    summary: null,
+                    error: null,
+                };
+            }
+            setHealthStates(initHealth);
+            setConnectionStates(initConnection);
+
+            if (catalog.length > 0) {
+                setSelectedDatabaseId((prev) => prev || catalog[0].id);
+            }
+
+            // Fire health checks in parallel — lightweight SELECT 1 per database
+            for (const db of catalog) {
+                if (db.configuration_status === "error") {
+                    setHealthStates((prev) => ({
+                        ...prev,
+                        [db.id]: {
+                            status: "unreachable",
+                            database: db.database,
+                            message: db.configuration_error || "Error de configuración",
+                        },
+                    }));
+                } else {
+                    checkDatabaseHealth(db.id);
+                }
+            }
+        } catch (error) {
+            setCatalogError(error.message || "No fue posible cargar el catálogo.");
+        } finally {
+            setCatalogLoading(false);
+        }
+    }
+
+    // --- Health check (SELECT 1 per database) ---
+
+    async function checkDatabaseHealth(databaseId) {
+        try {
+            setHealthStates((prev) => ({
+                ...prev,
+                [databaseId]: { ...prev[databaseId], status: "checking" },
+            }));
+
+            const result = await getDatabaseHealth(databaseId);
+
+            setHealthStates((prev) => ({
+                ...prev,
+                [databaseId]: {
+                    status: result.status === "ok" ? "active" : "unreachable",
+                    database: result.database || prev[databaseId]?.database,
+                    message: result.message || null,
+                },
+            }));
+        } catch (error) {
+            setHealthStates((prev) => ({
+                ...prev,
+                [databaseId]: {
+                    ...prev[databaseId],
+                    status: "unreachable",
+                    message: error.backendMessage || error.message || "No accesible",
+                },
             }));
         }
     }
+
+    // --- Connect a single database (loads tables + objects on demand) ---
+
+    async function connectDatabase(databaseId) {
+        const database = databases.find((db) => db.id === databaseId);
+        if (!database) return;
+
+        setConnectionStates((prev) => ({
+            ...prev,
+            [databaseId]: { ...prev[databaseId], status: "loading", error: null },
+        }));
+
+        try {
+            const [summaryResult, tablesResult, objectsResult] = await Promise.allSettled([
+                getDatabaseSummary(databaseId),
+                getDatabaseTables(databaseId),
+                getDatabaseObjects(databaseId),
+            ]);
+
+            const summary =
+                summaryResult.status === "fulfilled" ? summaryResult.value : null;
+
+            const rawTables =
+                tablesResult.status === "fulfilled"
+                    ? getListFromResponse(tablesResult.value, "data")
+                    : [];
+
+            const rawObjects =
+                objectsResult.status === "fulfilled"
+                    ? getListFromResponse(objectsResult.value, "data")
+                    : [];
+
+            const tables = rawTables.map((t, i) => normalizeTable(database, t, i));
+            const objects =
+                rawObjects.length > 0
+                    ? rawObjects.map((o, i) => normalizeObject(database, o, i))
+                    : tables;
+
+            setConnectionStates((prev) => ({
+                ...prev,
+                [databaseId]: {
+                    status: "loaded",
+                    tables,
+                    objects,
+                    summary,
+                    error: null,
+                },
+            }));
+
+            setSelectedDatabaseId(databaseId);
+        } catch (error) {
+            setConnectionStates((prev) => ({
+                ...prev,
+                [databaseId]: {
+                    ...prev[databaseId],
+                    status: "error",
+                    error: error.message || "No fue posible conectar.",
+                },
+            }));
+        }
+    }
+
+    // --- Handlers ---
 
     function handleDatabaseChange(databaseId) {
         setSelectedDatabaseId(databaseId);
@@ -571,25 +350,28 @@ function DashboardPage({ user, onLogout }) {
         setSelectedTable(object);
     }
 
+    // --- Render views ---
+
     function renderOverviewView() {
         return (
             <OverviewView
                 user={user}
                 databases={databases}
                 databaseSummaries={databaseSummaries}
+                healthStates={healthStates}
+                connectionStates={connectionStates}
                 allTables={catalogObjects}
                 dashboardStatus={dashboardStatus}
-                dashboardError={dashboardError}
+                dashboardError={catalogError}
                 onOpenExplorer={() => setActiveView("explorer")}
-                onRefreshCatalog={loadMultiDatabaseCatalog}
+                onRefreshCatalog={loadCatalog}
+                onConnectDatabase={connectDatabase}
             />
         );
     }
 
     function renderActiveView() {
-        if (activeView === "overview") {
-            return renderOverviewView();
-        }
+        if (activeView === "overview") return renderOverviewView();
 
         if (activeView === "audit") {
             return (
@@ -603,18 +385,26 @@ function DashboardPage({ user, onLogout }) {
         }
 
         if (activeView === "sources") {
-            if (!userIsAdmin) {
-                return renderOverviewView();
-            }
-
+            if (!userIsAdmin) return renderOverviewView();
             return (
                 <SourcesView
                     databases={databases}
                     databaseSummaries={databaseSummaries}
                     allTables={catalogObjects}
                     dashboardStatus={dashboardStatus}
-                    dashboardError={dashboardError}
-                    onRefreshCatalog={loadMultiDatabaseCatalog}
+                    dashboardError={catalogError}
+                    onRefreshCatalog={loadCatalog}
+                />
+            );
+        }
+
+        if (activeView === "queries") {
+            return (
+                <OperativeQueryView
+                    user={user}
+                    databases={databases}
+                    connectionStates={connectionStates}
+                    onConnectDatabase={connectDatabase}
                 />
             );
         }
@@ -624,6 +414,8 @@ function DashboardPage({ user, onLogout }) {
                 user={user}
                 databases={databases}
                 databaseSummaries={databaseSummaries}
+                healthStates={healthStates}
+                connectionStates={connectionStates}
                 selectedDatabase={selectedDatabase}
                 selectedDatabaseId={selectedDatabaseId}
                 allTables={allTables}
@@ -631,18 +423,19 @@ function DashboardPage({ user, onLogout }) {
                 selectedTable={selectedTable}
                 selectedObject={selectedObject}
                 dashboardStatus={dashboardStatus}
-                dashboardError={dashboardError}
+                dashboardError={catalogError}
                 onDatabaseChange={handleDatabaseChange}
                 onSelectTable={setSelectedTable}
                 onSelectObject={handleSelectObject}
                 onLogout={onLogout}
-                onRefreshCatalog={loadMultiDatabaseCatalog}
+                onRefreshCatalog={loadCatalog}
+                onConnectDatabase={connectDatabase}
             />
         );
     }
 
     useEffect(() => {
-        loadMultiDatabaseCatalog();
+        loadCatalog();
     }, []);
 
     return (
@@ -651,13 +444,17 @@ function DashboardPage({ user, onLogout }) {
             isMenuOpen={isMenuOpen}
             user={user}
             dashboardStatus={dashboardStatus}
-            onToggleMenu={() => setIsMenuOpen((current) => !current)}
+            onToggleMenu={() => setIsMenuOpen((c) => !c)}
             onCloseMenu={() => setIsMenuOpen(false)}
             onChangeView={setActiveView}
             onLogout={onLogout}
         >
-            <CatalogLoadingOverlay loadingState={catalogLoadingState} />
-
+            {catalogLoading && (
+                <div className="catalog-init-banner" role="status">
+                    <span className="catalog-init-spinner" />
+                    Cargando catálogo de fuentes...
+                </div>
+            )}
             {renderActiveView()}
         </DashboardShell>
     );

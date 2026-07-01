@@ -937,6 +937,183 @@
     background: rgba(8, 47, 73, 0.42);
 }
 
+/* ================================
+   DATABASE CONNECT PANEL
+================================ */
+
+@keyframes ddp-spin {
+    to { transform: rotate(360deg); }
+}
+
+.db-connect-panel {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 1px solid rgba(56, 189, 248, 0.12);
+    margin-top: 4px;
+}
+
+.db-health-status {
+    display: flex;
+    align-items: center;
+}
+
+.health-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.health-badge.checking {
+    background: rgba(148, 163, 184, 0.12);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.health-badge.active {
+    background: rgba(34, 197, 94, 0.12);
+    color: #4ade80;
+    border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.health-badge.unreachable {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.mini-spinner {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: ddp-spin 0.65s linear infinite;
+    flex-shrink: 0;
+}
+
+.db-connect-button {
+    padding: 10px 16px;
+    background: rgba(37, 99, 235, 0.85);
+    color: #f8fafc;
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    transition: background 0.15s, border-color 0.15s;
+    letter-spacing: 0.01em;
+}
+
+.db-connect-button:hover {
+    background: rgba(37, 99, 235, 1);
+    border-color: rgba(96, 165, 250, 0.6);
+}
+
+.db-loading-state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 10px;
+    border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.db-loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(56, 189, 248, 0.2);
+    border-top-color: #38bdf8;
+    border-radius: 50%;
+    animation: ddp-spin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+.db-loading-state strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 2px;
+}
+
+.db-loading-state span {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.db-error-state {
+    padding: 12px 14px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 10px;
+}
+
+.db-error-state strong {
+    display: block;
+    color: #f87171;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.db-error-state p {
+    color: #fca5a5;
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.db-connect-hint {
+    color: #475569;
+    font-size: 11px;
+    margin: 0;
+    line-height: 1.6;
+    text-align: center;
+}
+
+/* ================================
+   CATALOG INIT BANNER
+================================ */
+
+.catalog-init-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: rgba(37, 99, 235, 0.92);
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+    border-bottom: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.catalog-init-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: ddp-spin 0.65s linear infinite;
+}
+
 .object-content-tab.active {
     color: #020617;
     background: linear-gradient(135deg, #22d3ee, #38bdf8);

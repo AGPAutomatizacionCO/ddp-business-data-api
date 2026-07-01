@@ -7,8 +7,8 @@ export const msalConfig = {
         redirectUri: "https://BMARTIN-AGP:5173",
     },
     cache: {
-        cacheLocation: "sessionStorage",
-        storeAuthStateInCookie: false
+        cacheLocation: "localStorage",
+        storeAuthStateInCookie: true
     }
 };
 
